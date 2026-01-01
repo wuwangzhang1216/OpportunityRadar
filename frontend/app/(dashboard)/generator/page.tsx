@@ -33,7 +33,7 @@ const materialTypes = [
     label: "README",
     icon: FileText,
     description: "Project documentation",
-    color: "blue",
+    color: "primary",
   },
   {
     id: "pitch_3min",
@@ -59,23 +59,23 @@ const materialTypes = [
 ];
 
 const colorClasses: Record<string, { bg: string; border: string; text: string }> = {
-  blue: {
-    bg: "from-blue-500 to-blue-600",
-    border: "border-blue-500",
-    text: "text-blue-600",
+  primary: {
+    bg: "bg-primary",
+    border: "border-primary",
+    text: "text-primary",
   },
   purple: {
-    bg: "from-purple-500 to-purple-600",
+    bg: "bg-purple-500",
     border: "border-purple-500",
     text: "text-purple-600",
   },
   green: {
-    bg: "from-green-500 to-green-600",
+    bg: "bg-green-500",
     border: "border-green-500",
     text: "text-green-600",
   },
   orange: {
-    bg: "from-orange-500 to-orange-600",
+    bg: "bg-orange-500",
     border: "border-orange-500",
     text: "text-orange-600",
   },
@@ -181,17 +181,14 @@ export default function GeneratorPage() {
         className="relative"
       >
         <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur-xl opacity-50 animate-pulse" />
-            <div className="relative h-14 w-14 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl">
-              <Sparkles className="h-7 w-7 text-white" />
-            </div>
+          <div className="h-14 w-14 bg-primary rounded-2xl flex items-center justify-center">
+            <Sparkles className="h-7 w-7 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gradient-ai">
+            <h1 className="text-3xl font-bold text-foreground">
               AI Material Generator
             </h1>
-            <p className="text-gray-500 mt-1">
+            <p className="text-muted-foreground mt-1">
               Generate winning hackathon materials with AI
             </p>
           </div>
@@ -202,7 +199,7 @@ export default function GeneratorPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="mt-4"
           >
-            <Badge className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200">
+            <Badge className="bg-sky-100 text-primary border-sky-200">
               <Zap className="h-3 w-3 mr-1" />
               For: {opportunity.title}
             </Badge>
@@ -217,9 +214,9 @@ export default function GeneratorPage() {
         transition={{ delay: 0.1 }}
       >
         <Card variant="elevated" className="overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-purple-50/50 to-pink-50/50 border-b border-purple-100/50">
+          <CardHeader className="border-b border-border bg-secondary/30">
             <div className="flex items-center gap-2">
-              <Wand2 className="h-5 w-5 text-purple-600" />
+              <Wand2 className="h-5 w-5 text-primary" />
               <CardTitle className="text-lg">What do you need?</CardTitle>
             </div>
           </CardHeader>
@@ -239,8 +236,8 @@ export default function GeneratorPage() {
                     onClick={() => toggleType(type.id)}
                     className={`relative p-5 rounded-xl border-2 text-left transition-all ${
                       isSelected
-                        ? `${colors.border} bg-gradient-to-br from-white to-gray-50 shadow-lg`
-                        : "border-gray-100 hover:border-gray-200 hover:shadow-md bg-white"
+                        ? `${colors.border} bg-card shadow-sm`
+                        : "border-border hover:border-muted-foreground/30 hover:shadow-sm bg-card"
                     }`}
                   >
                     {isSelected && (
@@ -249,18 +246,18 @@ export default function GeneratorPage() {
                         animate={{ scale: 1 }}
                         className="absolute top-2 right-2"
                       >
-                        <div className={`h-5 w-5 rounded-full bg-gradient-to-r ${colors.bg} flex items-center justify-center`}>
+                        <div className={`h-5 w-5 rounded-full ${colors.bg} flex items-center justify-center`}>
                           <Check className="h-3 w-3 text-white" />
                         </div>
                       </motion.div>
                     )}
                     <div
-                      className={`h-12 w-12 rounded-xl bg-gradient-to-r ${colors.bg} flex items-center justify-center mb-3 shadow-md`}
+                      className={`h-12 w-12 rounded-xl ${colors.bg} flex items-center justify-center mb-3`}
                     >
                       <type.icon className="h-6 w-6 text-white" />
                     </div>
-                    <p className="font-semibold text-gray-900">{type.label}</p>
-                    <p className="text-xs text-gray-500 mt-1">{type.description}</p>
+                    <p className="font-semibold text-foreground">{type.label}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{type.description}</p>
                   </motion.button>
                 );
               })}
@@ -276,21 +273,21 @@ export default function GeneratorPage() {
         transition={{ delay: 0.2 }}
       >
         <Card variant="elevated" className="overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-50/50 to-purple-50/50 border-b border-blue-100/50">
+          <CardHeader className="border-b border-border bg-secondary/30">
             <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-blue-600" />
+              <Bot className="h-5 w-5 text-primary" />
               <CardTitle className="text-lg">Tell us about your project</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Project Name
                 </label>
                 <Input
                   placeholder="e.g., TaskMaster AI"
-                  className="h-12 rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  className="h-12 rounded-xl border-border focus:border-primary focus:ring-primary/20"
                   {...register("projectName")}
                 />
                 {errors.projectName && (
@@ -305,11 +302,11 @@ export default function GeneratorPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Problem Statement
                 </label>
                 <textarea
-                  className="flex min-h-[100px] w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm transition-colors placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
+                  className="flex min-h-[100px] w-full rounded-xl border border-border bg-background px-4 py-3 text-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
                   placeholder="What problem does your project solve?"
                   {...register("problem")}
                 />
@@ -325,11 +322,11 @@ export default function GeneratorPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Your Solution
                 </label>
                 <textarea
-                  className="flex min-h-[100px] w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm transition-colors placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
+                  className="flex min-h-[100px] w-full rounded-xl border border-border bg-background px-4 py-3 text-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
                   placeholder="How does your project solve this problem?"
                   {...register("solution")}
                 />
@@ -345,12 +342,12 @@ export default function GeneratorPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Tech Stack (comma-separated)
                 </label>
                 <Input
                   placeholder="e.g., React, Node.js, PostgreSQL, OpenAI"
-                  className="h-12 rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  className="h-12 rounded-xl border-border focus:border-primary focus:ring-primary/20"
                   {...register("techStack")}
                 />
                 {errors.techStack && (
@@ -367,7 +364,6 @@ export default function GeneratorPage() {
               <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
                 <Button
                   type="submit"
-                  variant="gradient"
                   size="lg"
                   className="w-full"
                   disabled={isGenerating || selectedTypes.length === 0}
@@ -403,23 +399,22 @@ export default function GeneratorPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           >
-            <Card variant="ai" className="overflow-hidden">
+            <Card variant="feature" className="overflow-hidden">
               <CardContent className="p-8">
                 <div className="flex flex-col items-center text-center">
                   <div className="relative mb-6">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-2xl opacity-30 animate-pulse" />
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      className="relative h-20 w-20 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center"
+                      className="h-20 w-20 rounded-full bg-primary flex items-center justify-center"
                     >
                       <Bot className="h-10 w-10 text-white" />
                     </motion.div>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900">
+                  <h3 className="text-xl font-bold text-foreground">
                     AI is working its magic...
                   </h3>
-                  <p className="text-gray-500 mt-2 max-w-md">
+                  <p className="text-muted-foreground mt-2 max-w-md">
                     Our AI is analyzing your project and generating professional
                     hackathon materials. This may take a moment.
                   </p>
@@ -457,15 +452,15 @@ export default function GeneratorPage() {
             className="space-y-6"
           >
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center shadow-lg">
+              <div className="h-10 w-10 rounded-xl bg-green-500 flex items-center justify-center">
                 <Check className="h-5 w-5 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Generated Materials</h2>
+              <h2 className="text-2xl font-bold text-foreground">Generated Materials</h2>
             </div>
 
             {Object.entries(generatedContent).map(([id, content], index) => {
               const type = materialTypes.find((t) => t.id === id);
-              const colors = type ? colorClasses[type.color] : colorClasses.blue;
+              const colors = type ? colorClasses[type.color] : colorClasses.primary;
 
               return (
                 <motion.div
@@ -475,9 +470,9 @@ export default function GeneratorPage() {
                   transition={{ delay: index * 0.1 }}
                 >
                   <Card variant="elevated" className="overflow-hidden">
-                    <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+                    <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-secondary/30">
                       <div className="flex items-center gap-3">
-                        <div className={`h-10 w-10 rounded-xl bg-gradient-to-r ${colors.bg} flex items-center justify-center shadow-md`}>
+                        <div className={`h-10 w-10 rounded-xl ${colors.bg} flex items-center justify-center`}>
                           {type?.icon && <type.icon className="h-5 w-5 text-white" />}
                         </div>
                         <CardTitle className="text-lg">{type?.label || id}</CardTitle>
@@ -519,10 +514,9 @@ export default function GeneratorPage() {
                     </CardHeader>
                     <CardContent className="p-0">
                       <div className="relative">
-                        <pre className="whitespace-pre-wrap text-sm p-6 overflow-x-auto max-h-[400px] bg-gray-50/50 scrollbar-modern">
+                        <pre className="whitespace-pre-wrap text-sm p-6 overflow-x-auto max-h-[400px] bg-secondary/20 scrollbar-modern">
                           {content}
                         </pre>
-                        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
                       </div>
                     </CardContent>
                   </Card>

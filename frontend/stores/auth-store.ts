@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { apiClient } from "@/services/api-client";
 
 interface User {
@@ -13,20 +13,24 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  hasHydrated: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, fullName: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
+  setHasHydrated: (state: boolean) => void;
 }
 
-export const useAuthStore = create<AuthState>()(
+// Create store with persist middleware
+const useAuthStoreBase = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
       isAuthenticated: false,
-      isLoading: false,
+      isLoading: true, // Start with loading true
+      hasHydrated: false,
       error: null,
 
       login: async (email: string, password: string) => {
@@ -65,20 +69,56 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
+        const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+
+        if (!token) {
+          set({ user: null, isAuthenticated: false, isLoading: false });
+          return;
+        }
+
+        // If we have user data from hydration and token exists, trust it
+        const currentState = get();
+        if (currentState.isAuthenticated && currentState.user) {
+          set({ isLoading: false });
+          return;
+        }
+
+        // Only fetch from API if we don't have user data
         set({ isLoading: true });
         try {
           const user = await apiClient.getMe();
           set({ user, isAuthenticated: true, isLoading: false });
         } catch {
+          // Token is invalid, clear it
+          apiClient.clearToken();
           set({ user: null, isAuthenticated: false, isLoading: false });
         }
       },
 
       clearError: () => set({ error: null }),
+
+      setHasHydrated: (state: boolean) => {
+        set({ hasHydrated: state, isLoading: false });
+      },
     }),
     {
       name: "auth-storage",
-      partialize: (state) => ({ isAuthenticated: state.isAuthenticated }),
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error("Hydration error:", error);
+        }
+        // Use setTimeout to ensure this runs after React hydration
+        setTimeout(() => {
+          useAuthStoreBase.setState({ hasHydrated: true, isLoading: false });
+        }, 0);
+      },
     }
   )
 );
+
+export const useAuthStore = useAuthStoreBase;

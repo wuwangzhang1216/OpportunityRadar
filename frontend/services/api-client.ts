@@ -26,10 +26,8 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
-        if (error.response?.status === 401) {
-          this.clearToken();
-          window.location.href = "/login";
-        }
+        // Don't auto-redirect on 401 - let the auth store handle it
+        // This prevents redirect loops and allows proper error handling
         return Promise.reject(error);
       }
     );
@@ -180,6 +178,40 @@ class ApiClient {
 
   async getMaterial(materialId: string) {
     const response = await this.client.get(`/materials/${materialId}`);
+    return response.data;
+  }
+
+  // Onboarding
+  async extractProfileFromUrl(url: string) {
+    const response = await this.client.post("/onboarding/extract", { url });
+    return response.data;
+  }
+
+  async confirmOnboarding(data: {
+    display_name?: string;
+    bio?: string;
+    tech_stack: string[];
+    industries: string[];
+    goals: string[];
+    interests: string[];
+    experience_level?: string;
+    team_size: number;
+    profile_type: string;
+    location_country?: string;
+    location_region?: string;
+    source_url?: string;
+  }) {
+    const response = await this.client.post("/onboarding/confirm", data);
+    return response.data;
+  }
+
+  async getOnboardingStatus() {
+    const response = await this.client.get("/onboarding/status");
+    return response.data;
+  }
+
+  async getOnboardingSuggestions() {
+    const response = await this.client.get("/onboarding/suggestions");
     return response.data;
   }
 }

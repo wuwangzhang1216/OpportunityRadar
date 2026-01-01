@@ -61,15 +61,12 @@ export default function DashboardPage() {
       {/* Header */}
       <motion.div variants={item}>
         <div className="flex items-center gap-3 mb-2">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl blur-lg opacity-50 animate-pulse" />
-            <div className="relative h-12 w-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Sparkles className="h-6 w-6 text-white" />
-            </div>
+          <div className="h-12 w-12 bg-primary rounded-2xl flex items-center justify-center">
+            <Sparkles className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-500">
+            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground">
               Your personalized hackathon command center
             </p>
           </div>
@@ -83,7 +80,7 @@ export default function DashboardPage() {
           value={matchStats?.total || 0}
           icon={<Target className="h-5 w-5" />}
           description="Opportunities for you"
-          color="blue"
+          color="primary"
           delay={0}
         />
         <StatCard
@@ -117,9 +114,9 @@ export default function DashboardPage() {
         {/* Top Matches */}
         <motion.div variants={item}>
           <Card variant="elevated" className="overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-blue-50/50 to-purple-50/50 border-b border-gray-100">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-secondary/30">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
                   <Zap className="h-4 w-4 text-white" />
                 </div>
                 <CardTitle className="text-lg">Top Matches</CardTitle>
@@ -156,18 +153,15 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <div className="relative inline-block mb-4">
-                    <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl" />
-                    <div className="relative h-16 w-16 mx-auto bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                      <Target className="h-8 w-8 text-blue-500" />
-                    </div>
+                  <div className="h-16 w-16 mx-auto bg-secondary rounded-full flex items-center justify-center mb-4">
+                    <Target className="h-8 w-8 text-muted-foreground" />
                   </div>
-                  <p className="font-medium text-gray-900">No matches yet</p>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="font-medium text-foreground">No matches yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
                     Complete your profile to get matched
                   </p>
                   <Link href="/profile">
-                    <Button variant="gradient" size="sm" className="mt-4">
+                    <Button size="sm" className="mt-4">
                       Complete Profile
                     </Button>
                   </Link>
@@ -180,9 +174,9 @@ export default function DashboardPage() {
         {/* Pipeline Overview */}
         <motion.div variants={item}>
           <Card variant="elevated" className="overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-green-50/50 to-blue-50/50 border-b border-gray-100">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-secondary/30">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-green-500 to-blue-500 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg bg-green-500 flex items-center justify-center">
                   <TrendingUp className="h-4 w-4 text-white" />
                 </div>
                 <CardTitle className="text-lg">Pipeline Overview</CardTitle>
@@ -211,7 +205,7 @@ export default function DashboardPage() {
                 <PipelineStage
                   label="Submitted"
                   count={pipelineStats?.by_stage?.submitted || 0}
-                  color="blue"
+                  color="primary"
                   total={pipelineStats?.total || 1}
                 />
                 <PipelineStage
@@ -234,10 +228,10 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <motion.div variants={item}>
-        <Card variant="ai" className="overflow-hidden">
-          <CardHeader className="border-b border-purple-100/50">
+        <Card variant="feature" className="overflow-hidden">
+          <CardHeader className="border-b border-border">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-600" />
+              <Sparkles className="h-5 w-5 text-primary" />
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </div>
           </CardHeader>
@@ -248,7 +242,7 @@ export default function DashboardPage() {
                 icon={<Target className="h-6 w-6" />}
                 title="Browse Opportunities"
                 description="Explore all available hackathons"
-                color="blue"
+                color="primary"
               />
               <QuickActionCard
                 href="/generator"
@@ -284,28 +278,28 @@ function StatCard({
   value: number | string;
   icon: React.ReactNode;
   description: string;
-  color: "blue" | "green" | "yellow" | "purple";
+  color: "primary" | "green" | "yellow" | "purple";
   delay: number;
 }) {
   const colorClasses = {
-    blue: {
-      bg: "from-blue-500 to-blue-600",
-      light: "from-blue-50 to-blue-100/50",
-      text: "text-blue-600",
+    primary: {
+      bg: "bg-primary",
+      light: "bg-sky-50",
+      text: "text-primary",
     },
     green: {
-      bg: "from-green-500 to-green-600",
-      light: "from-green-50 to-green-100/50",
+      bg: "bg-green-500",
+      light: "bg-green-50",
       text: "text-green-600",
     },
     yellow: {
-      bg: "from-yellow-500 to-orange-500",
-      light: "from-yellow-50 to-orange-50/50",
+      bg: "bg-yellow-500",
+      light: "bg-yellow-50",
       text: "text-yellow-600",
     },
     purple: {
-      bg: "from-purple-500 to-purple-600",
-      light: "from-purple-50 to-purple-100/50",
+      bg: "bg-purple-500",
+      light: "bg-purple-50",
       text: "text-purple-600",
     },
   };
@@ -323,7 +317,7 @@ function StatCard({
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">{title}</p>
+              <p className="text-sm font-medium text-muted-foreground">{title}</p>
               <motion.p
                 className="text-3xl font-bold mt-1"
                 initial={{ scale: 0.5 }}
@@ -332,13 +326,13 @@ function StatCard({
               >
                 {value}
               </motion.p>
-              <p className="text-xs text-gray-400 mt-1">{description}</p>
+              <p className="text-xs text-muted-foreground mt-1">{description}</p>
             </div>
             <div
-              className={`relative p-3 rounded-xl bg-gradient-to-br ${colors.light} group-hover:scale-110 transition-transform duration-300`}
+              className={`relative p-3 rounded-xl ${colors.light} group-hover:scale-110 transition-transform duration-300`}
             >
               <div
-                className={`absolute inset-0 bg-gradient-to-r ${colors.bg} rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
+                className={`absolute inset-0 ${colors.bg} rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
               />
               <div className={`relative ${colors.text} group-hover:text-white transition-colors`}>
                 {icon}
@@ -354,23 +348,26 @@ function StatCard({
 function MatchCard({ match }: { match: any }) {
   const scorePercent = Math.round((match.score || 0) * 100);
 
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "bg-green-500";
+    if (score >= 60) return "bg-primary";
+    if (score >= 40) return "bg-yellow-500";
+    return "bg-gray-400";
+  };
+
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 bg-white hover:border-blue-200 hover:shadow-md transition-all cursor-pointer group"
+      className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer group"
     >
       <div
-        className="relative h-14 w-14 rounded-xl flex items-center justify-center text-white font-bold shadow-lg overflow-hidden"
-        style={{
-          background: `linear-gradient(135deg, hsl(${Math.min(scorePercent * 1.2, 120)}, 70%, 50%), hsl(${Math.min(scorePercent * 1.2 + 20, 140)}, 70%, 45%))`,
-        }}
+        className={`h-14 w-14 rounded-xl flex items-center justify-center text-white font-bold ${getScoreColor(scorePercent)}`}
       >
-        <span className="relative z-10">{scorePercent}%</span>
-        <div className="absolute inset-0 bg-white/20 shimmer" />
+        {scorePercent}%
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium truncate group-hover:text-blue-600 transition-colors">
+        <p className="font-medium truncate group-hover:text-primary transition-colors">
           {match.opportunity_title}
         </p>
         <div className="flex items-center gap-2 mt-1">
@@ -378,7 +375,7 @@ function MatchCard({ match }: { match: any }) {
             {match.opportunity_category}
           </Badge>
           {match.deadline && (
-            <span className="text-xs text-gray-500 flex items-center gap-1">
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {formatRelativeTime(match.deadline)}
             </span>
@@ -386,7 +383,7 @@ function MatchCard({ match }: { match: any }) {
         </div>
       </div>
       <Link href={`/opportunities/${match.batch_id}`}>
-        <Button size="sm" variant="ghost" className="group-hover:bg-blue-50">
+        <Button size="sm" variant="ghost" className="group-hover:bg-secondary">
           <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
         </Button>
       </Link>
@@ -408,11 +405,11 @@ function PipelineStage({
   const percentage = total > 0 ? (count / total) * 100 : 0;
 
   const colorClasses: Record<string, { dot: string; bar: string }> = {
-    gray: { dot: "bg-gray-400", bar: "from-gray-400 to-gray-500" },
-    yellow: { dot: "bg-yellow-500", bar: "from-yellow-400 to-orange-500" },
-    blue: { dot: "bg-blue-500", bar: "from-blue-400 to-blue-600" },
-    purple: { dot: "bg-purple-500", bar: "from-purple-400 to-purple-600" },
-    green: { dot: "bg-green-500", bar: "from-green-400 to-green-600" },
+    gray: { dot: "bg-gray-400", bar: "bg-gray-400" },
+    yellow: { dot: "bg-yellow-500", bar: "bg-yellow-500" },
+    primary: { dot: "bg-primary", bar: "bg-primary" },
+    purple: { dot: "bg-purple-500", bar: "bg-purple-500" },
+    green: { dot: "bg-green-500", bar: "bg-green-500" },
   };
 
   const colors = colorClasses[color] || colorClasses.gray;
@@ -422,16 +419,16 @@ function PipelineStage({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className={`w-2.5 h-2.5 rounded-full ${colors.dot}`} />
-          <span className="text-sm font-medium text-gray-700">{label}</span>
+          <span className="text-sm font-medium text-foreground">{label}</span>
         </div>
         <span className="text-sm font-semibold">{count}</span>
       </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-2 bg-secondary rounded-full overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className={`h-full bg-gradient-to-r ${colors.bar} rounded-full`}
+          className={`h-full ${colors.bar} rounded-full`}
         />
       </div>
     </div>
@@ -449,20 +446,20 @@ function QuickActionCard({
   icon: React.ReactNode;
   title: string;
   description: string;
-  color: "blue" | "purple" | "green";
+  color: "primary" | "purple" | "green";
 }) {
   const colorClasses = {
-    blue: {
-      bg: "from-blue-500 to-blue-600",
-      hover: "hover:border-blue-300 hover:bg-blue-50/50",
+    primary: {
+      bg: "bg-primary",
+      hover: "hover:border-primary/50 hover:bg-sky-50/50",
     },
     purple: {
-      bg: "from-purple-500 to-purple-600",
-      hover: "hover:border-purple-300 hover:bg-purple-50/50",
+      bg: "bg-purple-500",
+      hover: "hover:border-purple-500/50 hover:bg-purple-50/50",
     },
     green: {
-      bg: "from-green-500 to-green-600",
-      hover: "hover:border-green-300 hover:bg-green-50/50",
+      bg: "bg-green-500",
+      hover: "hover:border-green-500/50 hover:bg-green-50/50",
     },
   };
 
@@ -473,15 +470,15 @@ function QuickActionCard({
       <motion.div
         whileHover={{ y: -4 }}
         whileTap={{ scale: 0.98 }}
-        className={`p-5 rounded-xl border-2 border-transparent bg-white/50 ${colors.hover} transition-all cursor-pointer group`}
+        className={`p-5 rounded-xl border border-border bg-card ${colors.hover} transition-all cursor-pointer group`}
       >
         <div
-          className={`h-12 w-12 rounded-xl bg-gradient-to-r ${colors.bg} flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform shadow-lg`}
+          className={`h-12 w-12 rounded-xl ${colors.bg} flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform`}
         >
           {icon}
         </div>
-        <h3 className="font-semibold text-gray-900">{title}</h3>
-        <p className="text-sm text-gray-500 mt-1">{description}</p>
+        <h3 className="font-semibold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground mt-1">{description}</p>
       </motion.div>
     </Link>
   );

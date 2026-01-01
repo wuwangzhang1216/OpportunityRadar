@@ -331,87 +331,134 @@ class DevpostScraper(BaseScraper):
         try:
             response = await client.get(url)
             if response.status_code != 200:
+                logger.warning(f"Detail page returned {response.status_code} for {url}")
                 return None
 
             soup = BeautifulSoup(response.text, "lxml")
 
-            # Title
-            title_elem = soup.select_one("h1, .challenge-title")
-            title = title_elem.get_text(strip=True) if title_elem else "Untitled"
+            # Title - try multiple selectors, prefer og:title for accuracy
+            title = "Untitled"
+            og_title = soup.select_one('meta[property="og:title"]')
+            if og_title and og_title.get("content"):
+                title = og_title.get("content")
+            else:
+                # Find h1 with actual text content
+                for h1 in soup.select("h1"):
+                    text = h1.get_text(strip=True)
+                    if text and len(text) > 3:
+                        title = text
+                        break
 
-            # Description
-            desc_elem = soup.select_one("#challenge-description, .challenge-description, .description")
-            description = desc_elem.get_text(strip=True)[:5000] if desc_elem else None
+            # Description - from challenge description section
+            description = None
+            desc_elem = soup.select_one("#challenge-description, .challenge-description")
+            if desc_elem:
+                description = desc_elem.get_text(separator=" ", strip=True)[:5000]
 
-            # Full rules/requirements
-            rules_elem = soup.select_one("#rules, .rules-section")
-            rules_text = rules_elem.get_text(strip=True) if rules_elem else ""
+            # Full rules/requirements text
+            rules_text = ""
+            rules_elem = soup.select_one("#rules, .rules")
+            if rules_elem:
+                rules_text = rules_elem.get_text(strip=True)
+
+            # Eligibility section
+            eligibility = []
+            elig_elem = soup.select_one("#eligibility, .eligibility")
+            if elig_elem:
+                rules_text += " " + elig_elem.get_text(strip=True)
+                for li in elig_elem.select("li"):
+                    eligibility.append({
+                        "type": "text",
+                        "rule": li.get_text(strip=True),
+                    })
 
             # Extract team size from rules
             team_min, team_max = self._extract_team_size(rules_text)
 
-            # Prizes section
+            # Prizes - look for prize items
             prizes = []
-            prize_section = soup.select_one("#prizes, .prizes-section")
-            if prize_section:
-                prize_items = prize_section.select(".prize, .prize-item, li")
-                for item in prize_items:
-                    prize_name = item.select_one(".prize-name, h3, h4")
-                    prize_amount = item.select_one(".prize-amount, .amount")
-                    if prize_name or prize_amount:
-                        prizes.append({
-                            "type": "prize",
-                            "name": prize_name.get_text(strip=True) if prize_name else "Prize",
-                            "amount": self._parse_prize_text(
-                                prize_amount.get_text(strip=True) if prize_amount else None
-                            ),
-                            "currency": "USD",
-                        })
+            total_prize = None
+            prize_items = soup.select(".prize, article .prize")
+            for item in prize_items:
+                prize_title = item.select_one(".prize-title, h3, h4")
+                prize_desc = item.select_one(".prize-description, p")
+                if prize_title:
+                    name = prize_title.get_text(strip=True)
+                    desc = prize_desc.get_text(strip=True) if prize_desc else ""
+                    amount = self._parse_prize_text(name + " " + desc)
+                    prizes.append({
+                        "type": "prize",
+                        "name": name,
+                        "description": desc,
+                        "amount": amount,
+                        "currency": "USD",
+                    })
+                    if amount:
+                        total_prize = (total_prize or 0) + amount
 
-            # Themes/Tags
-            theme_elems = soup.select(".theme, .tag, .challenge-theme")
-            themes = [t.get_text(strip=True) for t in theme_elems]
+            # Themes/Tags from sidebar or theme elements
+            themes = []
+            theme_elems = soup.select('[class*="theme"]:not([class*="themes-link"])')
+            for t in theme_elems:
+                text = t.get_text(strip=True)
+                # Filter out dates and empty strings
+                if text and len(text) < 50 and not any(month in text for month in ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]):
+                    themes.append(text)
+            themes = list(dict.fromkeys(themes))  # Remove duplicates while preserving order
 
-            # Tech requirements
-            tech_section = soup.select_one("#requirements, .tech-requirements")
+            # Tech stack from software section or description
             tech_stack = []
-            if tech_section:
-                tech_items = tech_section.select("li, .tech-item")
-                tech_stack = [t.get_text(strip=True) for t in tech_items]
+            sw_elem = soup.select_one(".software, .technologies")
+            if sw_elem:
+                tech_items = sw_elem.select("span, li, a")
+                tech_stack = [t.get_text(strip=True) for t in tech_items if t.get_text(strip=True)]
 
-            # Dates - look for structured data
+            # If no tech found, try to extract from description
+            if not tech_stack and description:
+                common_tech = ["Python", "JavaScript", "React", "Node.js", "TensorFlow", "PyTorch",
+                              "AWS", "GCP", "Azure", "Docker", "Kubernetes", "HTML", "CSS",
+                              "TypeScript", "Vue", "Angular", "Flutter", "Swift", "Kotlin"]
+                tech_stack = [t for t in common_tech if t.lower() in description.lower()]
+
+            # Dates from timeline or submission period
             start_date = None
             end_date = None
-            date_section = soup.select_one(".dates, .timeline, #timeline")
+            date_section = soup.select_one(".submission-period, .timeline-container, [class*='date']")
             if date_section:
                 dates_text = date_section.get_text()
                 start_date, end_date = self._parse_date_range(dates_text)
 
-            # Eligibility
-            eligibility = []
-            elig_section = soup.select_one("#eligibility, .eligibility")
-            if elig_section:
-                elig_items = elig_section.select("li")
-                for item in elig_items:
-                    eligibility.append({
-                        "type": "text",
-                        "rule": item.get_text(strip=True),
-                    })
-
             # Check for student only
-            student_only = "student" in rules_text.lower() and any(
-                word in rules_text.lower() for word in ["only", "must be", "required"]
+            full_text = (rules_text + " " + (description or "")).lower()
+            student_only = "student" in full_text and any(
+                word in full_text for word in ["only", "must be", "required", "eligible"]
             )
 
-            # Image
-            img = soup.select_one(".challenge-logo img, .cover-image img, meta[property='og:image']")
+            # Image - og:image is most reliable
             image_url = None
-            if img:
-                image_url = img.get("src") or img.get("content")
+            og_image = soup.select_one('meta[property="og:image"]')
+            if og_image and og_image.get("content"):
+                image_url = og_image.get("content")
+            else:
+                img = soup.select_one(".challenge-logo img, .cover-image img, header img")
+                if img:
+                    image_url = img.get("src")
 
             # Host/organizer
-            host_elem = soup.select_one(".host-info, .organizer, .managed-by")
-            host_name = host_elem.get_text(strip=True) if host_elem else None
+            host_name = None
+            host_elem = soup.select_one(".host-info, .organizer, .managed-by a")
+            if host_elem:
+                host_name = host_elem.get_text(strip=True)
+
+            # Location info
+            location = "Online"
+            is_online = True
+            loc_elem = soup.select_one(".location, [class*='location']")
+            if loc_elem:
+                loc_text = loc_elem.get_text(strip=True)
+                if loc_text and "online" not in loc_text.lower():
+                    location = loc_text
+                    is_online = "online" in loc_text.lower() or "virtual" in loc_text.lower()
 
             return RawOpportunity(
                 source=self.source_name,
@@ -423,11 +470,12 @@ class DevpostScraper(BaseScraper):
                 start_date=start_date,
                 end_date=end_date,
                 submission_deadline=end_date,
-                location="Online",
-                is_online=True,
+                location=location,
+                is_online=is_online,
                 team_min=team_min,
                 team_max=team_max,
                 prizes=prizes,
+                total_prize_amount=total_prize,
                 tags=themes[:10],
                 themes=themes[:10],
                 tech_stack=tech_stack[:10],
@@ -439,6 +487,8 @@ class DevpostScraper(BaseScraper):
 
         except Exception as e:
             logger.error(f"Failed to scrape detail for {external_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def _extract_team_size(self, text: str) -> tuple[Optional[int], Optional[int]]:
@@ -478,13 +528,16 @@ class DevpostScraper(BaseScraper):
         match = re.search(r"[\$€£]?\s*([\d,]+(?:\.\d{2})?)\s*(?:k|K)?", text)
         if match:
             amount_str = match.group(1).replace(",", "")
-            amount = float(amount_str)
-
-            # Handle "k" suffix (thousands)
-            if "k" in text.lower():
-                amount *= 1000
-
-            return amount
+            if not amount_str:  # Empty string check
+                return None
+            try:
+                amount = float(amount_str)
+                # Handle "k" suffix (thousands)
+                if "k" in text.lower():
+                    amount *= 1000
+                return amount
+            except ValueError:
+                return None
 
         return None
 

@@ -1,5 +1,6 @@
 """Security utilities for authentication and authorization."""
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -10,6 +11,8 @@ from passlib.context import CryptContext
 from beanie import PydanticObjectId
 
 from ..config import settings
+
+logger = logging.getLogger(__name__)
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -76,7 +79,8 @@ def decode_token(token: str) -> Optional[dict[str, Any]]:
             algorithms=[settings.jwt_algorithm],
         )
         return payload
-    except JWTError:
+    except JWTError as e:
+        logger.error(f"JWT decode error: {e}, token[:50]: {token[:50]}...")
         return None
 
 
@@ -98,18 +102,24 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    logger.debug(f"get_current_user called with token[:50]: {token[:50]}...")
+
     payload = decode_token(token)
     if payload is None:
+        logger.error("Token decode returned None")
         raise credentials_exception
 
     user_id: str = payload.get("sub")
     if user_id is None:
+        logger.error(f"Token payload missing 'sub': {payload}")
         raise credentials_exception
 
     # Fetch user from MongoDB
+    logger.debug(f"Looking up user with id: {user_id}")
     user = await User.get(PydanticObjectId(user_id))
 
     if user is None:
+        logger.error(f"User not found for id: {user_id}")
         raise credentials_exception
 
     if not user.is_active:
@@ -118,4 +128,5 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             detail="Inactive user",
         )
 
+    logger.debug(f"Authenticated user: {user.email}")
     return user

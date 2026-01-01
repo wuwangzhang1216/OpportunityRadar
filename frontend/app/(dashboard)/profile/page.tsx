@@ -143,7 +143,7 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -153,11 +153,11 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <User className="h-8 w-8 text-blue-600" />
+          <h1 className="text-3xl font-bold flex items-center gap-2 text-foreground">
+            <User className="h-8 w-8 text-primary" />
             Your Profile
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Tell us about yourself to get better matches
           </p>
         </div>
@@ -259,13 +259,13 @@ export default function ProfilePage() {
                   key={intent.id}
                   type="button"
                   onClick={() => toggleIntent(intent.id)}
-                  className={`p-3 rounded-lg border-2 text-left transition ${
+                  className={`p-3 rounded-xl border-2 text-left transition ${
                     intents?.includes(intent.id)
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "border-primary bg-sky-50"
+                      : "border-border hover:border-muted-foreground/50"
                   }`}
                 >
-                  <span className="font-medium">{intent.label}</span>
+                  <span className="font-medium text-foreground">{intent.label}</span>
                 </button>
               ))}
             </div>
@@ -288,7 +288,7 @@ export default function ProfilePage() {
           <CardContent>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-medium mb-1 text-foreground">
                   Hours available per week
                 </label>
                 <Input
@@ -299,7 +299,7 @@ export default function ProfilePage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium mb-1 text-foreground">
                     Preferred team size (min)
                   </label>
                   <Input
@@ -308,7 +308,7 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium mb-1 text-foreground">
                     Preferred team size (max)
                   </label>
                   <Input

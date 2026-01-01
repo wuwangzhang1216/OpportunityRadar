@@ -95,3 +95,4 @@ node_modules/
 out/
 .npm
 *.tsbuildinfo
+.claude/

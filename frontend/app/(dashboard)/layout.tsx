@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/services/api-client";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -37,19 +38,68 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, user, logout, checkAuth, isLoading } = useAuthStore();
+  const { isAuthenticated, user, logout, checkAuth, isLoading, hasHydrated } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    // Wait for hydration to complete before doing anything
+    if (!hasHydrated) return;
+
+    // Check if we need to verify auth
+    const token = localStorage.getItem("auth_token");
+
+    if (!token) {
+      // No token at all, redirect to login
+      router.push("/login");
+      return;
+    }
+
+    // If we have a token and user data from hydration, we're good
+    if (isAuthenticated && user) {
+      setAuthChecked(true);
+      return;
+    }
+
+    // We have a token but no user data, try to fetch it
+    if (!authChecked) {
+      checkAuth().then(() => {
+        setAuthChecked(true);
+      });
+    }
+  }, [hasHydrated, isAuthenticated, user, authChecked]);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // Only redirect after we've done a proper auth check
+    if (hasHydrated && authChecked && !isLoading && !isAuthenticated) {
       router.push("/login");
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [hasHydrated, authChecked, isLoading, isAuthenticated, router]);
+
+  // Check onboarding status and redirect if not completed
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      // Only check after auth is confirmed
+      if (authChecked && !isLoading && isAuthenticated && !onboardingChecked) {
+        try {
+          const status = await apiClient.getOnboardingStatus();
+          console.log("Onboarding status:", status);
+          if (!status.onboarding_completed) {
+            router.push("/onboarding");
+            return; // Don't set onboardingChecked, let the redirect happen
+          }
+          setOnboardingChecked(true);
+        } catch (error) {
+          // If check fails, allow access but log error
+          console.error("Failed to check onboarding status:", error);
+          setOnboardingChecked(true);
+        }
+      }
+    };
+    checkOnboarding();
+  }, [authChecked, isLoading, isAuthenticated, onboardingChecked, router]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -60,15 +110,16 @@ export default function DashboardLayout({
     router.push("/login");
   };
 
-  if (isLoading) {
+  // Show loading while hydrating, checking auth, or checking onboarding
+  if (!hasHydrated || isLoading || !authChecked || (isAuthenticated && !onboardingChecked)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="h-12 w-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
             <Sparkles className="absolute inset-0 m-auto h-5 w-5 text-primary animate-pulse" />
           </div>
-          <p className="text-sm text-gray-500 animate-pulse">Loading...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">Loading...</p>
         </div>
       </div>
     );
@@ -79,7 +130,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+    <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
       <motion.aside
         initial={false}
@@ -87,15 +138,12 @@ export default function DashboardLayout({
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="fixed left-0 top-0 z-40 h-screen hidden lg:block"
       >
-        <div className="flex h-full flex-col glass border-r border-white/20">
+        <div className="flex h-full flex-col bg-card border-r border-border">
           {/* Logo */}
-          <div className="flex h-16 items-center justify-between px-4 border-b border-gray-100/50">
+          <div className="flex h-16 items-center justify-between px-4 border-b border-border">
             <Link href="/dashboard" className="flex items-center gap-3">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl blur-lg opacity-50" />
-                <div className="relative h-10 w-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Radar className="h-6 w-6 text-white" />
-                </div>
+              <div className="h-10 w-10 bg-primary rounded-xl flex items-center justify-center">
+                <Radar className="h-6 w-6 text-white" />
               </div>
               <AnimatePresence>
                 {!isCollapsed && (
@@ -103,7 +151,7 @@ export default function DashboardLayout({
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
-                    className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
+                    className="text-lg font-bold text-foreground"
                   >
                     OpportunityRadar
                   </motion.span>
@@ -112,11 +160,11 @@ export default function DashboardLayout({
             </Link>
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 rounded-lg hover:bg-secondary transition-colors"
             >
               <ChevronRight
                 className={cn(
-                  "h-4 w-4 text-gray-400 transition-transform duration-300",
+                  "h-4 w-4 text-muted-foreground transition-transform duration-300",
                   isCollapsed && "rotate-180"
                 )}
               />
@@ -136,13 +184,13 @@ export default function DashboardLayout({
                       "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                       isActive
                         ? "text-primary"
-                        : "text-gray-600 hover:text-gray-900"
+                        : "text-muted-foreground hover:text-foreground"
                     )}
                   >
                     {isActive && (
                       <motion.div
                         layoutId="activeNav"
-                        className="absolute inset-0 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100/50"
+                        className="absolute inset-0 bg-secondary rounded-xl"
                         transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                       />
                     )}
@@ -150,8 +198,8 @@ export default function DashboardLayout({
                       className={cn(
                         "relative z-10 flex items-center justify-center w-9 h-9 rounded-lg transition-colors",
                         isActive
-                          ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md"
-                          : "bg-gray-100 text-gray-500 group-hover:bg-gray-200"
+                          ? "bg-primary text-white"
+                          : "bg-secondary text-muted-foreground"
                       )}
                     >
                       <item.icon className="h-5 w-5" />
@@ -175,15 +223,15 @@ export default function DashboardLayout({
           </nav>
 
           {/* User section */}
-          <div className="border-t border-gray-100/50 p-4">
+          <div className="border-t border-border p-4">
             <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")}>
               <div className="relative">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shadow-md">
+                <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
                   <span className="text-sm font-semibold text-white">
                     {user?.full_name?.charAt(0) || "U"}
                   </span>
                 </div>
-                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-white" />
+                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-card" />
               </div>
               <AnimatePresence>
                 {!isCollapsed && (
@@ -194,7 +242,7 @@ export default function DashboardLayout({
                     className="flex-1 min-w-0"
                   >
                     <p className="text-sm font-medium truncate">{user?.full_name}</p>
-                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -209,7 +257,7 @@ export default function DashboardLayout({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full justify-start text-gray-600 mt-3 hover:text-red-600 hover:bg-red-50"
+                    className="w-full justify-start text-muted-foreground mt-3 hover:text-red-600 hover:bg-red-50"
                     onClick={handleLogout}
                   >
                     <LogOut className="h-4 w-4 mr-2" />
@@ -224,26 +272,26 @@ export default function DashboardLayout({
 
       {/* Mobile Header */}
       <header className="fixed top-0 left-0 right-0 z-50 lg:hidden">
-        <div className="glass border-b border-white/20">
+        <div className="bg-card border-b border-border">
           <div className="flex items-center justify-between h-16 px-4">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="h-9 w-9 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+              <div className="h-9 w-9 bg-primary rounded-xl flex items-center justify-center">
                 <Radar className="h-5 w-5 text-white" />
               </div>
-              <span className="font-bold text-gradient-ai">OpportunityRadar</span>
+              <span className="font-bold text-foreground">OpportunityRadar</span>
             </Link>
             <div className="flex items-center gap-2">
-              <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                <Bell className="h-5 w-5 text-gray-600" />
+              <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
+                <Bell className="h-5 w-5 text-muted-foreground" />
               </button>
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-lg hover:bg-secondary transition-colors"
               >
                 {isMobileMenuOpen ? (
-                  <X className="h-5 w-5 text-gray-600" />
+                  <X className="h-5 w-5 text-muted-foreground" />
                 ) : (
-                  <Menu className="h-5 w-5 text-gray-600" />
+                  <Menu className="h-5 w-5 text-muted-foreground" />
                 )}
               </button>
             </div>
@@ -267,7 +315,7 @@ export default function DashboardLayout({
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed right-0 top-0 bottom-0 w-72 glass z-50 lg:hidden"
+              className="fixed right-0 top-0 bottom-0 w-72 bg-card border-l border-border z-50 lg:hidden"
             >
               <div className="flex flex-col h-full pt-20 pb-4">
                 <nav className="flex-1 space-y-1 px-3">
@@ -279,16 +327,16 @@ export default function DashboardLayout({
                           className={cn(
                             "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
                             isActive
-                              ? "bg-gradient-to-r from-blue-50 to-purple-50 text-primary border border-blue-100/50"
-                              : "text-gray-600 hover:bg-gray-50"
+                              ? "bg-secondary text-primary"
+                              : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                           )}
                         >
                           <div
                             className={cn(
                               "flex items-center justify-center w-9 h-9 rounded-lg",
                               isActive
-                                ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md"
-                                : "bg-gray-100 text-gray-500"
+                                ? "bg-primary text-white"
+                                : "bg-secondary text-muted-foreground"
                             )}
                           >
                             <item.icon className="h-5 w-5" />
@@ -299,22 +347,22 @@ export default function DashboardLayout({
                     );
                   })}
                 </nav>
-                <div className="border-t border-gray-100/50 px-4 pt-4">
+                <div className="border-t border-border px-4 pt-4">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                    <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
                       <span className="text-sm font-semibold text-white">
                         {user?.full_name?.charAt(0) || "U"}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{user?.full_name}</p>
-                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full justify-start text-gray-600 hover:text-red-600 hover:bg-red-50"
+                    className="w-full justify-start text-muted-foreground hover:text-red-600 hover:bg-red-50"
                     onClick={handleLogout}
                   >
                     <LogOut className="h-4 w-4 mr-2" />

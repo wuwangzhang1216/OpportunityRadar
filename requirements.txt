@@ -1,7 +1,7 @@
 # Core Framework
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
-pydantic>=2.5.0
+pydantic[email]>=2.5.0
 pydantic-settings>=2.1.0
 
 # Database
@@ -9,11 +9,13 @@ sqlalchemy[asyncio]>=2.0.25
 asyncpg>=0.29.0
 alembic>=1.13.0
 pgvector>=0.2.4
+motor>=3.3.0
 beanie>=1.25.0
 
 # Authentication
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<4.1.0
 python-multipart>=0.0.6
 
 # HTTP & Scraping

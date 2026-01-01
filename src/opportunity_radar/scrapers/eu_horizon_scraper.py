@@ -394,9 +394,197 @@ class EUHorizonScraper(BaseScraper):
             for p in programmes
         ]
 
+    @with_retry(max_attempts=3)
     async def scrape_detail(self, external_id: str, url: str) -> Optional[RawOpportunity]:
-        """Scrape detailed topic information."""
-        return None
+        """Scrape detailed EU funding topic information."""
+        # Extract topic ID from external_id (format: eu-{id})
+        topic_id = external_id.replace("eu-", "")
+
+        try:
+            client = await self.get_client()
+
+            # Fetch the detail page
+            response = await client.get(url, timeout=30.0, follow_redirects=True)
+
+            if response.status_code != 200:
+                logger.warning(f"EU Horizon detail page returned {response.status_code}")
+                return None
+
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(response.text, "lxml")
+
+            return self._parse_detail_page(soup, topic_id, url)
+
+        except Exception as e:
+            logger.error(f"Failed to scrape EU Horizon detail for {topic_id}: {e}")
+            return None
+
+    def _parse_detail_page(self, soup, topic_id: str, url: str) -> Optional[RawOpportunity]:
+        """Parse detailed EU funding page."""
+        try:
+            # Title - try multiple selectors
+            title = None
+            for selector in ["h1", ".page-title", "[class*='title']", "title"]:
+                elem = soup.select_one(selector)
+                if elem:
+                    title = elem.get_text(strip=True)
+                    if title and len(title) > 5:
+                        break
+
+            if not title:
+                title = f"EU Funding Opportunity: {topic_id}"
+
+            # Clean up title (remove site name suffixes)
+            for suffix in [" | European Commission", " - European Commission", " | EIC"]:
+                if suffix in title:
+                    title = title.split(suffix)[0].strip()
+
+            # Description - gather from multiple sections
+            description_parts = []
+
+            # Main content area
+            content_selectors = [
+                "article",
+                ".field--name-body",
+                ".content-body",
+                "#main-content",
+                ".page-content",
+                "[class*='description']",
+                "[class*='content']",
+            ]
+
+            for selector in content_selectors:
+                content_elem = soup.select_one(selector)
+                if content_elem:
+                    # Get text but skip navigation/menu items
+                    for nav in content_elem.select("nav, .menu, .breadcrumb, script, style"):
+                        nav.decompose()
+                    text = content_elem.get_text(separator="\n", strip=True)
+                    if text and len(text) > 100:
+                        description_parts.append(text[:3000])
+                        break
+
+            # Look for specific sections
+            section_keywords = {
+                "What is": "overview",
+                "Who can apply": "eligibility",
+                "Funding": "funding",
+                "Budget": "budget",
+                "How to apply": "process",
+                "Deadline": "deadline",
+                "Timeline": "timeline",
+            }
+
+            for heading in soup.select("h2, h3, h4"):
+                heading_text = heading.get_text(strip=True)
+                for keyword, section_type in section_keywords.items():
+                    if keyword.lower() in heading_text.lower():
+                        # Get the following content
+                        next_elem = heading.find_next_sibling()
+                        if next_elem:
+                            section_text = next_elem.get_text(strip=True)
+                            if section_text and len(section_text) > 20:
+                                description_parts.append(f"\n\n**{heading_text}:**\n{section_text[:500]}")
+                        break
+
+            description = "\n".join(description_parts)[:5000] if description_parts else f"EU funding opportunity: {title}"
+
+            # Budget/funding amount
+            budget = None
+            budget_patterns = [
+                r"EUR?\s*([\d.,]+)\s*million",
+                r"€\s*([\d.,]+)\s*million",
+                r"up to EUR?\s*([\d.,]+)",
+                r"up to €\s*([\d.,]+)",
+                r"([\d.,]+)\s*million EUR",
+                r"grant[s]?\s+(?:of\s+)?(?:up to\s+)?EUR?\s*([\d.,]+)",
+            ]
+
+            page_text = soup.get_text()
+            for pattern in budget_patterns:
+                match = re.search(pattern, page_text, re.IGNORECASE)
+                if match:
+                    try:
+                        amount_str = match.group(1).replace(",", ".")
+                        amount = float(amount_str)
+                        # Check if it's in millions
+                        if "million" in pattern.lower() or amount < 100:
+                            amount *= 1000000
+                        budget = amount
+                        break
+                    except ValueError:
+                        continue
+
+            # Deadlines
+            deadline = None
+            deadline_patterns = [
+                r"deadline[s]?[:\s]+([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})",
+                r"closes?[:\s]+([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})",
+                r"(\d{1,2}\s+[A-Z][a-z]+\s+\d{4})",
+                r"(\d{4}-\d{2}-\d{2})",
+            ]
+
+            for pattern in deadline_patterns:
+                match = re.search(pattern, page_text, re.IGNORECASE)
+                if match:
+                    deadline = match.group(1)
+                    break
+
+            # Tags based on content
+            tags = ["eu-funding", "horizon-europe", "europe", "research"]
+
+            tag_keywords = {
+                "eic": ["eic", "innovation-council"],
+                "accelerator": ["startup", "scale-up", "sme"],
+                "pathfinder": ["research", "breakthrough", "deep-tech"],
+                "transition": ["transition", "commercialization"],
+                "digital": ["digital", "technology"],
+                "green": ["green-deal", "sustainability", "climate"],
+                "health": ["health", "medical"],
+                "ai": ["ai", "artificial-intelligence"],
+                "msca": ["msca", "fellowship", "researcher"],
+                "erc": ["erc", "frontier-research"],
+            }
+
+            page_lower = page_text.lower()
+            for keyword, tag_list in tag_keywords.items():
+                if keyword in page_lower:
+                    tags.extend(tag_list)
+
+            # Remove duplicates while preserving order
+            tags = list(dict.fromkeys(tags))
+
+            # Themes
+            themes = ["research", "innovation", "eu-funding"]
+            if "startup" in tags or "sme" in tags:
+                themes.append("entrepreneurship")
+            if "digital" in tags:
+                themes.append("digital-transformation")
+            if "green-deal" in tags:
+                themes.append("sustainability")
+
+            return RawOpportunity(
+                source=self.source_name,
+                external_id=f"eu-{topic_id}",
+                title=title,
+                url=url,
+                description=description,
+                submission_deadline=deadline,
+                end_date=deadline,
+                location="European Union",
+                is_online=True,
+                regions=["EU", "Europe"],
+                total_prize_amount=budget,
+                prize_currency="EUR",
+                tags=tags,
+                themes=themes,
+                host_name="European Commission",
+                host_url="https://ec.europa.eu",
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to parse EU Horizon detail page: {e}")
+            return None
 
     async def health_check(self) -> bool:
         """Check if EU Portal is accessible."""
