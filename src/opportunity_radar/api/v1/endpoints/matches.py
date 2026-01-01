@@ -7,44 +7,32 @@ from beanie import PydanticObjectId
 
 from ....core.security import get_current_user
 from ....models.user import User
-from ....models.profile import Profile
 from ....models.match import Match
 
 router = APIRouter()
-
-
-async def _get_user_profile(user: User):
-    """Helper to get user's profile or raise 404."""
-    profile = await Profile.find_one(Profile.user_id == user.id)
-
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found. Please create a profile first.",
-        )
-
-    return profile
 
 
 @router.get("")
 async def list_matches(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    status_filter: Optional[str] = Query(None, alias="status"),
+    dismissed: Optional[bool] = Query(None),
+    bookmarked: Optional[bool] = Query(None),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get matches for current user.
 
-    - **status**: Filter by status (pending, interested, applied, dismissed)
+    - **dismissed**: Filter by dismissed status
+    - **bookmarked**: Filter by bookmarked status
     """
-    profile = await _get_user_profile(current_user)
+    query = {"user_id": current_user.id}
+    if dismissed is not None:
+        query["is_dismissed"] = dismissed
+    if bookmarked is not None:
+        query["is_bookmarked"] = bookmarked
 
-    query = {"profile_id": profile.id}
-    if status_filter:
-        query["status"] = status_filter
-
-    matches = await Match.find(query).skip(offset).limit(limit).to_list()
+    matches = await Match.find(query).sort(-Match.overall_score).skip(offset).limit(limit).to_list()
     total = await Match.find(query).count()
 
     return {
@@ -63,14 +51,12 @@ async def get_top_matches(
     """
     Get top N matches with detailed reasons and score breakdown.
 
-    Returns the highest scoring matches that are still pending (not dismissed).
+    Returns the highest scoring matches that are not dismissed.
     """
-    profile = await _get_user_profile(current_user)
-
     matches = await Match.find(
-        Match.profile_id == profile.id,
-        Match.status == "pending"
-    ).sort(-Match.score).limit(limit).to_list()
+        Match.user_id == current_user.id,
+        Match.is_dismissed == False
+    ).sort(-Match.overall_score).limit(limit).to_list()
 
     return {"items": matches, "count": len(matches)}
 
@@ -80,40 +66,28 @@ async def get_match_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Get match statistics for current user."""
-    profile = await _get_user_profile(current_user)
-
-    # Get counts by status
-    pending_count = await Match.find(
-        Match.profile_id == profile.id, Match.status == "pending"
-    ).count()
-    interested_count = await Match.find(
-        Match.profile_id == profile.id, Match.status == "interested"
-    ).count()
-    applied_count = await Match.find(
-        Match.profile_id == profile.id, Match.status == "applied"
+    # Get counts
+    total_count = await Match.find(Match.user_id == current_user.id).count()
+    bookmarked_count = await Match.find(
+        Match.user_id == current_user.id, Match.is_bookmarked == True
     ).count()
     dismissed_count = await Match.find(
-        Match.profile_id == profile.id, Match.status == "dismissed"
+        Match.user_id == current_user.id, Match.is_dismissed == True
     ).count()
 
-    total = pending_count + interested_count + applied_count + dismissed_count
-
     # Calculate average score
-    all_matches = await Match.find(Match.profile_id == profile.id).to_list()
+    all_matches = await Match.find(Match.user_id == current_user.id).to_list()
     avg_score = (
-        sum(m.score for m in all_matches) / len(all_matches)
+        sum(m.overall_score for m in all_matches) / len(all_matches)
         if all_matches
         else 0
     )
 
     return {
-        "total_matches": total,
-        "by_status": {
-            "pending": pending_count,
-            "interested": interested_count,
-            "applied": applied_count,
-            "dismissed": dismissed_count,
-        },
+        "total_matches": total_count,
+        "bookmarked": bookmarked_count,
+        "dismissed": dismissed_count,
+        "active": total_count - dismissed_count,
         "average_score": round(avg_score, 3),
     }
 
@@ -124,8 +98,6 @@ async def dismiss_match(
     current_user: User = Depends(get_current_user),
 ):
     """Dismiss a match (hide from recommendations)."""
-    profile = await _get_user_profile(current_user)
-
     try:
         match = await Match.get(PydanticObjectId(match_id))
     except Exception:
@@ -134,26 +106,24 @@ async def dismiss_match(
             detail="Match not found",
         )
 
-    if not match or match.profile_id != profile.id:
+    if not match or match.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Match not found",
         )
 
-    match.status = "dismissed"
+    match.is_dismissed = True
     await match.save()
 
     return {"message": "Match dismissed", "match_id": match_id}
 
 
-@router.post("/{match_id}/interested")
-async def mark_interested(
+@router.post("/{match_id}/bookmark")
+async def bookmark_match(
     match_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    """Mark a match as interested (save for later)."""
-    profile = await _get_user_profile(current_user)
-
+    """Bookmark a match (save for later)."""
     try:
         match = await Match.get(PydanticObjectId(match_id))
     except Exception:
@@ -162,26 +132,24 @@ async def mark_interested(
             detail="Match not found",
         )
 
-    if not match or match.profile_id != profile.id:
+    if not match or match.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Match not found",
         )
 
-    match.status = "interested"
+    match.is_bookmarked = True
     await match.save()
 
-    return {"message": "Marked as interested", "match_id": match_id}
+    return {"message": "Match bookmarked", "match_id": match_id}
 
 
-@router.post("/{match_id}/apply")
-async def mark_applied(
+@router.post("/{match_id}/unbookmark")
+async def unbookmark_match(
     match_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    """Mark a match as applied."""
-    profile = await _get_user_profile(current_user)
-
+    """Remove bookmark from a match."""
     try:
         match = await Match.get(PydanticObjectId(match_id))
     except Exception:
@@ -190,16 +158,16 @@ async def mark_applied(
             detail="Match not found",
         )
 
-    if not match or match.profile_id != profile.id:
+    if not match or match.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Match not found",
         )
 
-    match.status = "applied"
+    match.is_bookmarked = False
     await match.save()
 
-    return {"message": "Marked as applied", "match_id": match_id}
+    return {"message": "Bookmark removed", "match_id": match_id}
 
 
 @router.post("/{match_id}/restore")
@@ -207,9 +175,7 @@ async def restore_match(
     match_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    """Restore a dismissed match back to pending."""
-    profile = await _get_user_profile(current_user)
-
+    """Restore a dismissed match."""
     try:
         match = await Match.get(PydanticObjectId(match_id))
     except Exception:
@@ -218,13 +184,13 @@ async def restore_match(
             detail="Match not found",
         )
 
-    if not match or match.profile_id != profile.id:
+    if not match or match.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Match not found",
         )
 
-    match.status = "pending"
+    match.is_dismissed = False
     await match.save()
 
     return {"message": "Match restored", "match_id": match_id}

@@ -1,4 +1,22 @@
 services:
+  # MongoDB for document storage
+  mongodb:
+    image: mongo:7
+    container_name: opportunity_radar_mongodb
+    environment:
+      MONGO_INITDB_DATABASE: opportunity_radar
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - opportunity_radar_network
+
   # PostgreSQL with pgvector
   db:
     image: pgvector/pgvector:pg16
@@ -42,8 +60,12 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: opportunity_radar_backend
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-opportunity_radar}
+      - MONGODB_URL=mongodb://mongodb:27017
+      - MONGODB_DATABASE=opportunity_radar
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
@@ -53,6 +75,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
+      mongodb:
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:
@@ -73,9 +97,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
     container_name: opportunity_radar_frontend
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     ports:
       - "3000:3000"
     depends_on:
@@ -97,6 +123,7 @@ services:
       - dev
 
 volumes:
+  mongodb_data:
   postgres_data:
   redis_data:
 

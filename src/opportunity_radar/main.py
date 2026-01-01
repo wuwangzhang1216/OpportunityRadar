@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -11,6 +12,14 @@ from .config import settings
 from .core.exceptions import AppException
 from .api.v1.router import api_router
 from .db.mongodb import init_db, close_db
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+# Set our app's logger to DEBUG for more detail
+logging.getLogger("src.opportunity_radar").setLevel(logging.DEBUG)
 
 
 @asynccontextmanager

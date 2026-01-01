@@ -226,13 +226,25 @@ class BaseScraper(ABC):
         """Scrape detailed information for a single opportunity."""
         pass
 
-    async def scrape_all(self, max_pages: Optional[int] = None) -> ScraperResult:
-        """Scrape all available opportunities."""
+    async def scrape_all(
+        self,
+        max_pages: Optional[int] = None,
+        fetch_details: bool = True,
+        max_details: Optional[int] = None,
+    ) -> ScraperResult:
+        """Scrape all available opportunities.
+
+        Args:
+            max_pages: Maximum number of list pages to scrape
+            fetch_details: Whether to fetch detailed info for each opportunity
+            max_details: Maximum number of details to fetch (None = all)
+        """
         max_pages = max_pages or self.max_pages
         all_opportunities: List[RawOpportunity] = []
         errors: List[str] = []
         page = 1
 
+        # Phase 1: Scrape list pages
         while page <= max_pages:
             if not self.circuit_breaker.can_execute():
                 logger.warning(f"Circuit breaker open for {self.source_name}")
@@ -264,6 +276,47 @@ class BaseScraper(ABC):
                 errors.append(f"Page {page}: {str(e)}")
                 logger.error(f"[{self.source_name}] Error on page {page}: {e}")
                 break
+
+        # Phase 2: Fetch details for each opportunity
+        if fetch_details and all_opportunities:
+            detailed_opportunities: List[RawOpportunity] = []
+            to_fetch = all_opportunities[:max_details] if max_details else all_opportunities
+
+            logger.info(f"[{self.source_name}] Fetching details for {len(to_fetch)} opportunities...")
+
+            for i, opp in enumerate(to_fetch):
+                if not self.circuit_breaker.can_execute():
+                    logger.warning(f"Circuit breaker open, stopping detail fetch")
+                    # Keep remaining opportunities with basic info
+                    detailed_opportunities.extend(to_fetch[i:])
+                    break
+
+                try:
+                    detailed = await self.scrape_detail(opp.external_id, opp.url)
+                    if detailed:
+                        # Merge: keep detail info but preserve any list-only fields
+                        detailed_opportunities.append(detailed)
+                        self.circuit_breaker.record_success()
+                    else:
+                        # Keep original if detail fetch failed
+                        detailed_opportunities.append(opp)
+
+                    if (i + 1) % 10 == 0:
+                        logger.info(f"[{self.source_name}] Fetched {i + 1}/{len(to_fetch)} details")
+
+                    await asyncio.sleep(self.request_delay)
+
+                except Exception as e:
+                    errors.append(f"Detail {opp.external_id}: {str(e)}")
+                    logger.warning(f"[{self.source_name}] Failed to fetch detail for {opp.external_id}: {e}")
+                    detailed_opportunities.append(opp)  # Keep basic info
+                    self.circuit_breaker.record_failure()
+
+            # Add any remaining opportunities that weren't fetched
+            if max_details and len(all_opportunities) > max_details:
+                detailed_opportunities.extend(all_opportunities[max_details:])
+
+            all_opportunities = detailed_opportunities
 
         status = ScraperStatus.SUCCESS
         if errors:

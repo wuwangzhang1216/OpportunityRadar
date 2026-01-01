@@ -38,7 +38,7 @@ export default function SignupPage() {
   const onSubmit = async (data: SignupForm) => {
     try {
       await signup(data.email, data.password, data.fullName);
-      router.push("/profile");
+      router.push("/onboarding");
     } catch {
       // Error is handled by the store
     }

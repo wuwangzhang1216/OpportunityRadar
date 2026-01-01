@@ -41,8 +41,8 @@ export default function OpportunitiesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Opportunities</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-3xl font-bold text-foreground">Opportunities</h1>
+        <p className="text-muted-foreground mt-1">
           Discover hackathons, grants, and funding opportunities
         </p>
       </div>
@@ -50,7 +50,7 @@ export default function OpportunitiesPage() {
       {/* Filters */}
       <div className="flex gap-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search opportunities..."
             className="pl-10"
@@ -84,21 +84,21 @@ export default function OpportunitiesPage() {
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse">
               <CardContent className="pt-6">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                <div className="h-3 bg-gray-100 rounded w-1/2 mb-4" />
-                <div className="h-20 bg-gray-50 rounded" />
+                <div className="h-4 bg-secondary rounded w-3/4 mb-2" />
+                <div className="h-3 bg-secondary/50 rounded w-1/2 mb-4" />
+                <div className="h-20 bg-secondary/30 rounded" />
               </CardContent>
             </Card>
           ))}
         </div>
       ) : data?.items?.length > 0 ? (
         <>
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-muted-foreground">
             Showing {data.items.length} of {data.total} opportunities
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {data.items.map((opp: any) => (
-              <OpportunityCard key={opp.id} opportunity={opp} />
+              <OpportunityCard key={opp.id || opp._id} opportunity={opp} />
             ))}
           </div>
 
@@ -112,7 +112,7 @@ export default function OpportunitiesPage() {
               >
                 Previous
               </Button>
-              <span className="flex items-center px-4 text-sm text-gray-600">
+              <span className="flex items-center px-4 text-sm text-muted-foreground">
                 Page {page + 1} of {Math.ceil(data.total / limit)}
               </span>
               <Button
@@ -127,11 +127,11 @@ export default function OpportunitiesPage() {
         </>
       ) : (
         <div className="text-center py-12">
-          <Target className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900">
+          <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium text-foreground">
             No opportunities found
           </h3>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Try adjusting your search or filters
           </p>
         </div>
@@ -142,43 +142,48 @@ export default function OpportunitiesPage() {
 
 function OpportunityCard({ opportunity }: { opportunity: any }) {
   const categoryColors: Record<string, string> = {
-    hackathon: "bg-blue-100 text-blue-800",
+    hackathon: "bg-sky-100 text-sky-800",
     grant: "bg-green-100 text-green-800",
     bounty: "bg-orange-100 text-orange-800",
     accelerator: "bg-purple-100 text-purple-800",
     competition: "bg-pink-100 text-pink-800",
   };
 
+  // MongoDB returns _id, Beanie may serialize it as id or _id
+  const opportunityId = opportunity.id || opportunity._id;
+  // Backend uses opportunity_type, frontend may expect category
+  const category = opportunity.category || opportunity.opportunity_type || "hackathon";
+
   return (
-    <Link href={`/opportunities/${opportunity.id}`}>
-      <Card className="h-full hover:shadow-md transition cursor-pointer">
+    <Link href={`/opportunities/${opportunityId}`}>
+      <Card className="h-full hover:shadow-md transition cursor-pointer border-border">
         <CardContent className="pt-6">
           <div className="flex items-start justify-between mb-3">
             <Badge
               className={
-                categoryColors[opportunity.category] || "bg-gray-100 text-gray-800"
+                categoryColors[category] || "bg-secondary text-secondary-foreground"
               }
             >
-              {opportunity.category}
+              {category}
             </Badge>
             {opportunity.match_score && (
-              <div className="text-sm font-medium text-blue-600">
+              <div className="text-sm font-medium text-primary">
                 {Math.round(opportunity.match_score * 100)}% match
               </div>
             )}
           </div>
 
-          <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+          <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-foreground">
             {opportunity.title}
           </h3>
 
           {opportunity.description && (
-            <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
               {opportunity.description}
             </p>
           )}
 
-          <div className="space-y-2 text-sm text-gray-500">
+          <div className="space-y-2 text-sm text-muted-foreground">
             {opportunity.deadline && (
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />

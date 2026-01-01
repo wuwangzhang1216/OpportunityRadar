@@ -404,10 +404,237 @@ class HackerOneScraper(BaseScraper):
 
         return opportunities
 
+    @with_retry(max_attempts=3)
     async def scrape_detail(self, external_id: str, url: str) -> Optional[RawOpportunity]:
-        """Scrape detailed program information."""
-        # For HackerOne, the list already contains most details
-        return None
+        """Scrape detailed program information using GraphQL."""
+        # Extract handle from external_id (format: h1-{handle})
+        handle = external_id.replace("h1-", "")
+
+        try:
+            client = await self.get_client()
+
+            # Detailed GraphQL query for a single program
+            query = """
+            query TeamProfile($handle: String!) {
+                team(handle: $handle) {
+                    id
+                    handle
+                    name
+                    about
+                    website
+                    state
+                    submission_state
+                    currency
+                    default_currency
+                    offers_bounties
+                    offers_swag
+                    base_bounty
+                    average_bounty_lower_amount
+                    average_bounty_upper_amount
+                    top_bounty_lower_amount
+                    top_bounty_upper_amount
+                    resolved_report_count
+                    allows_bounty_splitting
+                    profile_picture
+                    cover_color
+                    policy
+                    response_efficiency_percentage
+                    first_response_time
+                    bounty_split_enabled
+                    bug_count
+                    publicly_visible_retesting
+                    triage_active
+                }
+            }
+            """
+
+            response = await client.post(
+                self._api_base,
+                json={"query": query, "variables": {"handle": handle}},
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                timeout=30.0,
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+
+                if "errors" not in data and data.get("data", {}).get("team"):
+                    team_data = data["data"]["team"]
+                    return self._parse_detailed_program(team_data, url)
+
+            # Fallback: try HTML scraping for additional details
+            return await self._scrape_html_detail(handle, url)
+
+        except Exception as e:
+            logger.warning(f"Failed to scrape HackerOne detail for {handle}: {e}")
+            return None
+
+    async def _scrape_html_detail(self, handle: str, url: str) -> Optional[RawOpportunity]:
+        """Fallback HTML scraping for program details."""
+        try:
+            client = await self.get_client()
+            response = await client.get(url, timeout=30.0)
+
+            if response.status_code != 200:
+                return None
+
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(response.text, "lxml")
+
+            # Try to find program info in script tags (Next.js data)
+            for script in soup.select("script"):
+                text = script.get_text()
+                if "__NEXT_DATA__" in text or handle in text:
+                    import json
+                    try:
+                        # Find JSON in script
+                        start = text.find("{")
+                        end = text.rfind("}") + 1
+                        if start >= 0 and end > start:
+                            json_data = json.loads(text[start:end])
+                            # Look for team data in the JSON
+                            if "team" in str(json_data).lower():
+                                # Extract relevant data
+                                return self._parse_nextjs_data(json_data, handle, url)
+                    except json.JSONDecodeError:
+                        continue
+
+            return None
+
+        except Exception as e:
+            logger.debug(f"HackerOne HTML scraping failed for {handle}: {e}")
+            return None
+
+    def _parse_nextjs_data(self, data: dict, handle: str, url: str) -> Optional[RawOpportunity]:
+        """Parse program data from Next.js page data."""
+        try:
+            # Navigate through Next.js data structure
+            props = data.get("props", {}).get("pageProps", {})
+            team = props.get("team", {})
+
+            if not team:
+                return None
+
+            return self._parse_detailed_program(team, url)
+        except Exception:
+            return None
+
+    def _parse_detailed_program(self, data: dict, url: str) -> Optional[RawOpportunity]:
+        """Parse detailed program data from GraphQL or HTML."""
+        try:
+            handle = data.get("handle")
+            if not handle:
+                return None
+
+            name = data.get("name") or handle
+
+            # Parse bounty amounts
+            lower = data.get("average_bounty_lower_amount", 0) or 0
+            upper = data.get("average_bounty_upper_amount", 0) or 0
+            top_lower = data.get("top_bounty_lower_amount", 0) or 0
+            top_upper = data.get("top_bounty_upper_amount", 0) or 0
+            base_bounty = data.get("base_bounty", 0) or 0
+
+            avg_bounty = (lower + upper) / 2 if lower and upper else base_bounty
+            max_bounty = max(top_lower, top_upper) if top_lower or top_upper else avg_bounty
+            currency = data.get("default_currency") or data.get("currency", "USD") or "USD"
+
+            # Build comprehensive description
+            description_parts = []
+
+            # About section
+            about = data.get("about", "")
+            if about:
+                description_parts.append(about)
+
+            # Policy/scope (may contain scope details)
+            policy = data.get("policy", "")
+            if policy and len(policy) < 3000:
+                description_parts.append(f"\n\n**Program Scope:**\n{policy[:2000]}")
+
+            # Stats
+            resolved_count = data.get("resolved_report_count", 0)
+            bug_count = data.get("bug_count", 0)
+            response_pct = data.get("response_efficiency_percentage", 0)
+
+            stats = []
+            if resolved_count:
+                stats.append(f"Resolved reports: {resolved_count}")
+            if bug_count:
+                stats.append(f"Bugs found: {bug_count}")
+            if response_pct:
+                stats.append(f"Response efficiency: {response_pct}%")
+            if max_bounty and max_bounty > avg_bounty:
+                stats.append(f"Top bounty: ${max_bounty:,.0f}")
+
+            if stats:
+                description_parts.append("\n\n**Program Stats:**\n" + "\n".join(stats))
+
+            # Website
+            website = data.get("website", "")
+            if website:
+                description_parts.append(f"\n\nWebsite: {website}")
+
+            description = "\n".join(description_parts) if description_parts else f"Bug bounty program for {name}"
+
+            # Tags
+            tags = ["bug-bounty", "security", "hackerone", "vulnerability"]
+            if data.get("offers_swag"):
+                tags.append("swag")
+            if data.get("allows_bounty_splitting") or data.get("bounty_split_enabled"):
+                tags.append("bounty-splitting")
+            if data.get("publicly_visible_retesting"):
+                tags.append("retesting")
+            if data.get("triage_active"):
+                tags.append("triaged")
+
+            # Image
+            image_url = data.get("profile_picture")
+            if image_url and not image_url.startswith("http"):
+                image_url = f"https://hackerone.com{image_url}"
+
+            # Prizes info
+            prizes = []
+            if avg_bounty > 0:
+                prizes.append({
+                    "name": "Average Bounty",
+                    "amount": avg_bounty,
+                    "currency": currency,
+                })
+            if max_bounty > avg_bounty:
+                prizes.append({
+                    "name": "Maximum Bounty",
+                    "amount": max_bounty,
+                    "currency": currency,
+                })
+
+            return RawOpportunity(
+                source=self.source_name,
+                external_id=f"h1-{handle}",
+                title=f"{name} Bug Bounty Program",
+                url=url,
+                description=description[:5000],
+                image_url=image_url,
+                location="Online",
+                is_online=True,
+                regions=["Global"],
+                total_prize_amount=max_bounty if max_bounty > 0 else (avg_bounty if avg_bounty > 0 else None),
+                prize_currency=currency,
+                prizes=prizes,
+                tags=tags,
+                themes=["security", "bug-bounty", "hacking", "cybersecurity"],
+                tech_stack=["web", "mobile", "api"],
+                host_name=name,
+                host_url=website or url,
+                raw_data=data,
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to parse HackerOne detailed program: {e}")
+            return None
 
     async def health_check(self) -> bool:
         """Check if HackerOne is accessible."""

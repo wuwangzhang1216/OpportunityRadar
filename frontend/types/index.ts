@@ -124,3 +124,70 @@ export type MaterialType =
   | "pitch_5min"
   | "demo_script"
   | "qa_pred";
+
+// Onboarding types
+export type URLType = "website" | "github_repo";
+
+export interface ExtractedField {
+  value: string | string[] | number | null;
+  confidence: number;
+  source: string;
+}
+
+export interface ExtractedProfile {
+  url_type: URLType;
+  source_url: string;
+  company_name?: ExtractedField;
+  product_description?: ExtractedField;
+  tech_stack?: ExtractedField;
+  industries?: ExtractedField;
+  team_size?: ExtractedField;
+  profile_type?: ExtractedField;
+  location?: ExtractedField;
+  goals?: ExtractedField;
+  raw_content_preview?: string;
+}
+
+export interface URLExtractRequest {
+  url: string;
+}
+
+export interface URLExtractResponse {
+  success: boolean;
+  extracted_profile?: ExtractedProfile;
+  error_message?: string;
+}
+
+export interface OnboardingConfirmRequest {
+  display_name?: string;
+  bio?: string;
+  tech_stack: string[];
+  industries: string[];
+  goals: string[];
+  interests: string[];
+  experience_level?: string;
+  team_size: number;
+  profile_type: string;
+  location_country?: string;
+  location_region?: string;
+  source_url?: string;
+}
+
+export interface OnboardingConfirmResponse {
+  success: boolean;
+  profile_id?: string;
+  onboarding_completed: boolean;
+  error_message?: string;
+}
+
+export interface OnboardingStatusResponse {
+  has_profile: boolean;
+  onboarding_completed: boolean;
+  profile_id?: string;
+}
+
+export interface OnboardingSuggestions {
+  tech_stacks: string[];
+  goals: string[];
+  industries: string[];
+}

@@ -29,7 +29,7 @@ async def list_pipelines(
     """
     query = {"user_id": current_user.id}
     if stage:
-        query["stage"] = stage
+        query["status"] = stage
 
     items = await Pipeline.find(query).skip(skip).limit(limit).to_list()
     total = await Pipeline.find(query).count()
@@ -51,7 +51,7 @@ async def get_pipeline_stats(
     for stage in VALID_STAGES:
         count = await Pipeline.find(
             Pipeline.user_id == current_user.id,
-            Pipeline.stage == stage
+            Pipeline.status == stage
         ).count()
         stats[stage] = count
 
@@ -109,9 +109,8 @@ async def create_pipeline(
     pipeline = Pipeline(
         user_id=current_user.id,
         opportunity_id=PydanticObjectId(opportunity_id),
-        stage=pipeline_data.get("stage", "discovered"),
+        status=pipeline_data.get("stage", "discovered"),
         notes=pipeline_data.get("notes"),
-        deadline=pipeline_data.get("deadline"),
     )
     await pipeline.insert()
 
@@ -176,7 +175,7 @@ async def move_to_stage(
             detail="Pipeline item not found",
         )
 
-    pipeline.stage = stage
+    pipeline.status = stage
     pipeline.updated_at = datetime.utcnow()
     await pipeline.save()
 

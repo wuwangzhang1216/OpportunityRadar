@@ -398,24 +398,223 @@ class GrantsGovScraper(BaseScraper):
             logger.warning(f"Failed to parse Grants.gov opportunity: {e}")
             return None
 
+    @with_retry(max_attempts=3)
     async def scrape_detail(self, external_id: str, url: str) -> Optional[RawOpportunity]:
-        """Scrape detailed grant information."""
-        # Extract grant ID from external_id
+        """Scrape detailed grant information using fetchOpportunity API."""
+        # Extract grant ID from external_id (format: grants-gov-{id})
         grant_id = external_id.replace("grants-gov-", "")
 
         try:
-            client = await self.get_client()
-            detail_url = f"https://www.grants.gov/grantsws/rest/opportunity/details?oppId={grant_id}"
-
-            response = await client.get(detail_url)
-            if response.status_code != 200:
+            # Try to convert to numeric ID for API
+            try:
+                opp_id = int(grant_id)
+            except ValueError:
+                logger.warning(f"Invalid grant ID format: {grant_id}")
                 return None
 
-            data = response.json()
-            return self._parse_grant(data)
+            client = await self.get_client()
+
+            # New Grants.gov fetchOpportunity API (2025)
+            fetch_url = "https://api.grants.gov/v1/api/fetchOpportunity"
+
+            response = await client.post(
+                fetch_url,
+                json={"opportunityId": opp_id},
+                headers={"Content-Type": "application/json"},
+                timeout=30.0,
+            )
+
+            if response.status_code != 200:
+                logger.warning(f"Grants.gov fetchOpportunity returned {response.status_code}")
+                return None
+
+            result = response.json()
+
+            # Check for API errors
+            if result.get("errorcode") != 0:
+                logger.warning(f"Grants.gov API error: {result.get('msg')}")
+                return None
+
+            data = result.get("data", {})
+            if not data:
+                return None
+
+            return self._parse_detailed_grant(data, url)
 
         except Exception as e:
-            logger.error(f"Failed to scrape Grants.gov detail: {e}")
+            logger.error(f"Failed to scrape Grants.gov detail for {grant_id}: {e}")
+            return None
+
+    def _parse_detailed_grant(self, data: dict, url: str) -> Optional[RawOpportunity]:
+        """Parse detailed grant data from fetchOpportunity API response."""
+        try:
+            opp_id = data.get("id") or data.get("opportunityNumber")
+            if not opp_id:
+                return None
+
+            title = data.get("opportunityTitle", "Untitled Grant")
+            opp_number = data.get("opportunityNumber", "")
+
+            # Get synopsis data (contains most details)
+            synopsis = data.get("synopsis", {}) or {}
+
+            # Build comprehensive description
+            description_parts = []
+
+            # Synopsis description
+            if synopsis.get("synopsisDesc"):
+                description_parts.append(synopsis["synopsisDesc"])
+
+            # Agency info
+            agency_name = synopsis.get("agencyName") or data.get("owningAgencyCode", "US Federal Government")
+            if agency_name:
+                description_parts.append(f"\n\n**Agency:** {agency_name}")
+
+            # Opportunity number
+            if opp_number:
+                description_parts.append(f"**Opportunity Number:** {opp_number}")
+
+            # Funding details
+            award_ceiling = data.get("awardCeiling") or synopsis.get("awardCeiling")
+            award_floor = data.get("awardFloor") or synopsis.get("awardFloor")
+            estimated_funding = synopsis.get("estimatedTotalProgramFunding")
+            expected_awards = synopsis.get("expectedNumberOfAwards")
+
+            if award_ceiling or award_floor:
+                funding_range = []
+                if award_floor:
+                    funding_range.append(f"${award_floor:,.0f}" if isinstance(award_floor, (int, float)) else f"${award_floor}")
+                if award_ceiling:
+                    funding_range.append(f"${award_ceiling:,.0f}" if isinstance(award_ceiling, (int, float)) else f"${award_ceiling}")
+                description_parts.append(f"**Award Range:** {' - '.join(funding_range)}")
+
+            if estimated_funding:
+                try:
+                    est = float(str(estimated_funding).replace(",", "").replace("$", ""))
+                    description_parts.append(f"**Estimated Total Funding:** ${est:,.0f}")
+                except ValueError:
+                    description_parts.append(f"**Estimated Total Funding:** {estimated_funding}")
+
+            if expected_awards:
+                description_parts.append(f"**Expected Awards:** {expected_awards}")
+
+            # Cost sharing requirement
+            cost_sharing = data.get("costSharing") or synopsis.get("costSharingOrMatchingRequirement")
+            if cost_sharing:
+                description_parts.append(f"**Cost Sharing Required:** {'Yes' if cost_sharing else 'No'}")
+
+            # Eligibility
+            applicant_types = data.get("applicantTypes", [])
+            if applicant_types:
+                eligible = [at.get("description", at.get("id", "")) for at in applicant_types if at]
+                if eligible:
+                    description_parts.append(f"\n\n**Eligible Applicants:**\n" + "\n".join(f"• {e}" for e in eligible[:10]))
+
+            # Funding instruments
+            funding_instruments = data.get("fundingInstruments", [])
+            if funding_instruments:
+                instruments = [fi.get("description", "") for fi in funding_instruments if fi]
+                if instruments:
+                    description_parts.append(f"\n\n**Funding Type:** {', '.join(instruments)}")
+
+            # Contact info
+            contact_name = synopsis.get("agencyContactName")
+            contact_email = synopsis.get("agencyContactEmail")
+            contact_phone = synopsis.get("agencyContactPhone")
+            if contact_name or contact_email:
+                contact_parts = []
+                if contact_name:
+                    contact_parts.append(contact_name)
+                if contact_email:
+                    contact_parts.append(contact_email)
+                if contact_phone:
+                    contact_parts.append(contact_phone)
+                description_parts.append(f"\n\n**Contact:** {' | '.join(contact_parts)}")
+
+            description = "\n".join(description_parts) if description_parts else f"Federal grant opportunity: {title}"
+
+            # Parse dates
+            close_date = synopsis.get("responseDate") or synopsis.get("applicationsDueDate")
+            open_date = data.get("postingDate") or synopsis.get("postingDate")
+
+            # Parse award amount for prize field
+            prize_amount = None
+            if award_ceiling:
+                try:
+                    prize_amount = float(str(award_ceiling).replace(",", "").replace("$", ""))
+                except ValueError:
+                    pass
+            elif estimated_funding:
+                try:
+                    prize_amount = float(str(estimated_funding).replace(",", "").replace("$", ""))
+                except ValueError:
+                    pass
+
+            # Tags
+            tags = ["grants.gov", "federal-grant", "us-government"]
+            category = data.get("opportunityCategory", {})
+            if isinstance(category, dict) and category.get("description"):
+                tags.append(category["description"].lower().replace(" ", "-"))
+
+            # Funding categories
+            funding_categories = data.get("fundingActivityCategories", [])
+            for fc in funding_categories:
+                if fc and fc.get("description"):
+                    tags.append(fc["description"].lower().replace(" ", "-"))
+
+            # Themes based on agency
+            themes = ["government-funding", "federal-grants"]
+            agency_code = data.get("owningAgencyCode", "").lower()
+            if "nsf" in agency_code:
+                themes.extend(["research", "science"])
+            elif "doe" in agency_code:
+                themes.append("energy")
+            elif "nih" in agency_code or "hhs" in agency_code:
+                themes.extend(["health", "research"])
+            elif "darpa" in agency_code or "dod" in agency_code:
+                themes.extend(["defense", "innovation"])
+            elif "nasa" in agency_code:
+                themes.extend(["space", "research"])
+            elif "usda" in agency_code:
+                themes.append("agriculture")
+
+            # Eligibility rules
+            eligibility_rules = []
+            for at in applicant_types:
+                if at and at.get("description"):
+                    eligibility_rules.append({"type": "applicant_type", "value": at["description"]})
+
+            # ALNs (Assistance Listing Numbers)
+            alns = data.get("alns", [])
+            if alns:
+                for aln in alns[:5]:
+                    if aln and aln.get("programTitle"):
+                        eligibility_rules.append({"type": "program", "value": aln["programTitle"]})
+
+            return RawOpportunity(
+                source=self.source_name,
+                external_id=f"grants-gov-{opp_id}",
+                title=title,
+                url=url,
+                description=description[:5000],
+                start_date=open_date,
+                end_date=close_date,
+                submission_deadline=close_date,
+                location="United States",
+                is_online=True,
+                regions=["US", "United States"],
+                total_prize_amount=prize_amount,
+                prize_currency="USD",
+                tags=tags,
+                themes=themes,
+                host_name=agency_name,
+                host_url="https://www.grants.gov",
+                eligibility_rules=eligibility_rules,
+                raw_data=data,
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to parse Grants.gov detailed opportunity: {e}")
             return None
 
     async def health_check(self) -> bool:
