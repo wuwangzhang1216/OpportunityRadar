@@ -96,3 +96,5 @@ out/
 .npm
 *.tsbuildinfo
 .claude/
+CLAUDE.md
+AGENTS.md

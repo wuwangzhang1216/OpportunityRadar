@@ -2,10 +2,11 @@
 
 import asyncio
 import logging
+import os
 import sys
 
-# Add the src directory to Python path
-sys.path.insert(0, "e:\\OpportunityRadar")
+# Add the project root to Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
