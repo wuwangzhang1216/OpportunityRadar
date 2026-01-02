@@ -19,7 +19,7 @@ bcrypt>=4.0.0,<4.1.0
 python-multipart>=0.0.6
 
 # HTTP & Scraping
-httpx>=0.26.0
+httpx[socks]>=0.26.0
 playwright>=1.41.0
 beautifulsoup4>=4.12.0
 lxml>=5.1.0
