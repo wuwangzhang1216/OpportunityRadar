@@ -130,3 +130,17 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
     logger.debug(f"Authenticated user: {user.email}")
     return user
+
+
+async def require_admin(user=Depends(get_current_user)):
+    """
+    Dependency that requires admin (superuser) access.
+
+    Use as a dependency on admin-only endpoints.
+    """
+    if not user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user

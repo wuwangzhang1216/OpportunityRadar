@@ -6,6 +6,7 @@ from .opportunity import Host, Opportunity
 from .match import Match
 from .pipeline import Pipeline
 from .material import Material
+from .scraper_run import ScraperRun
 
 __all__ = [
     "User",
@@ -15,4 +16,5 @@ __all__ = [
     "Match",
     "Pipeline",
     "Material",
+    "ScraperRun",
 ]
