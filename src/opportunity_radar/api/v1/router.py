@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from .endpoints import auth, opportunities, profiles, matches, materials, pipelines, onboarding
+from .admin import admin_router
 
 api_router = APIRouter(prefix="/v1")
 
@@ -14,3 +15,6 @@ api_router.include_router(profiles.router, prefix="/profiles", tags=["Profiles"]
 api_router.include_router(matches.router, prefix="/matches", tags=["Matches"])
 api_router.include_router(materials.router, prefix="/materials", tags=["Materials"])
 api_router.include_router(pipelines.router, prefix="/pipelines", tags=["Pipelines"])
+
+# Admin endpoints
+api_router.include_router(admin_router)
