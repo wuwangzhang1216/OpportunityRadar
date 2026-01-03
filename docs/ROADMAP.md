@@ -19,7 +19,7 @@ This document tracks the implementation plan for OpportunityRadar's core feature
 | Feature | Plan | Status | Progress |
 |---------|------|--------|----------|
 | Opportunity Crawler | [P0-opportunity-crawler.md](./plans/P0-opportunity-crawler.md) | `COMPLETED` | 100% |
-| Admin Dashboard | [P0-admin-dashboard.md](./plans/P0-admin-dashboard.md) | `NOT_STARTED` | 0% |
+| Admin Dashboard | [P0-admin-dashboard.md](./plans/P0-admin-dashboard.md) | `IN_PROGRESS` | 50% |
 
 ### P1 - Core Experience
 
@@ -54,7 +54,7 @@ This document tracks the implementation plan for OpportunityRadar's core feature
 ```
 Phase 1: Data Foundation
 ├── [1] Opportunity Crawler      ✅ COMPLETED (513 opportunities)
-└── [2] Admin Dashboard          ← Current Focus
+└── [2] Admin Dashboard          🔄 IN PROGRESS (Backend ✅, Frontend pending)
 
 Phase 2: Core Value
 ├── [3] Team Profile Enhancement
@@ -88,9 +88,11 @@ Phase 3: Growth Ready
 
 ~~1. **Opportunity Crawler** - Automated data collection from major platforms~~ ✅ DONE
 
+~~2. **Admin Dashboard Backend** - API endpoints for data management~~ ✅ DONE
+
 Next priority:
 
-2. **Admin Dashboard** - Manual data management and quality control
+3. **Admin Dashboard Frontend** - UI for opportunity/crawler/user management
 
 ---
 
@@ -145,5 +147,6 @@ cd frontend && npm run dev
 
 | Date | Change |
 |------|--------|
+| 2026-01-03 | P0 Admin Dashboard Backend completed - 15 endpoints, ScraperRun model (PR #1) |
 | 2026-01-03 | P0 Opportunity Crawler completed - 513 opportunities from 12 sources |
 | 2026-01-03 | Initial roadmap created |
