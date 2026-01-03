@@ -1,15 +1,18 @@
 """Admin API router with all admin endpoints."""
 
+import asyncio
 import csv
 import io
 import json
 import logging
-from datetime import datetime
-from typing import List, Literal, Optional
+import re
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
+from bson.errors import InvalidId
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from ....core.security import require_admin
 from ....models.opportunity import Opportunity
@@ -17,10 +20,64 @@ from ....models.user import User
 from ....models.match import Match
 from ....models.pipeline import Pipeline
 from ....models.scraper_run import ScraperRun
+from ....scrapers.scheduler import ScraperRegistry
 
 logger = logging.getLogger(__name__)
 
 admin_router = APIRouter(prefix="/admin", tags=["Admin"])
+
+# Constants
+MAX_IMPORT_SIZE = 10 * 1024 * 1024  # 10MB
+MAX_BULK_IDS = 100  # Maximum IDs per bulk operation
+MAX_SEARCH_LENGTH = 100  # Maximum search query length
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+
+async def get_or_404(
+    model: type,
+    id: str,
+    entity_name: str = "Resource",
+) -> Any:
+    """Fetch entity by ID or raise 404.
+
+    Args:
+        model: The Beanie Document class to query.
+        id: The string ID to look up.
+        entity_name: Name for error messages.
+
+    Returns:
+        The found document.
+
+    Raises:
+        HTTPException: 400 if ID format is invalid, 404 if not found.
+    """
+    try:
+        entity = await model.get(PydanticObjectId(id))
+    except InvalidId:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid {entity_name} ID format",
+        )
+    if not entity:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{entity_name} not found",
+        )
+    return entity
+
+
+def escape_regex(pattern: str) -> str:
+    """Escape special regex characters to prevent injection."""
+    return re.escape(pattern)
+
+
+def utc_now() -> datetime:
+    """Get current UTC time with timezone info."""
+    return datetime.now(timezone.utc)
 
 
 # =============================================================================
@@ -33,23 +90,23 @@ class OpportunityCreate(BaseModel):
 
     external_id: str
     title: str
-    description: Optional[str] = None
-    short_description: Optional[str] = None
+    description: str | None = None
+    short_description: str | None = None
     opportunity_type: str = "hackathon"
-    format: Optional[str] = None
-    location_type: Optional[str] = None
-    location_city: Optional[str] = None
-    location_country: Optional[str] = None
-    website_url: Optional[str] = None
-    registration_url: Optional[str] = None
-    logo_url: Optional[str] = None
-    banner_url: Optional[str] = None
-    themes: List[str] = Field(default_factory=list)
-    technologies: List[str] = Field(default_factory=list)
-    total_prize_value: Optional[float] = None
+    format: str | None = None
+    location_type: str | None = None
+    location_city: str | None = None
+    location_country: str | None = None
+    website_url: str | None = None
+    registration_url: str | None = None
+    logo_url: str | None = None
+    banner_url: str | None = None
+    themes: list[str] = Field(default_factory=list)
+    technologies: list[str] = Field(default_factory=list)
+    total_prize_value: float | None = None
     currency: str = "USD"
-    team_size_min: Optional[int] = None
-    team_size_max: Optional[int] = None
+    team_size_min: int | None = None
+    team_size_max: int | None = None
     is_featured: bool = False
     is_active: bool = True
 
@@ -57,33 +114,33 @@ class OpportunityCreate(BaseModel):
 class OpportunityUpdate(BaseModel):
     """Schema for updating an opportunity (partial update)."""
 
-    title: Optional[str] = None
-    description: Optional[str] = None
-    short_description: Optional[str] = None
-    opportunity_type: Optional[str] = None
-    format: Optional[str] = None
-    location_type: Optional[str] = None
-    location_city: Optional[str] = None
-    location_country: Optional[str] = None
-    website_url: Optional[str] = None
-    registration_url: Optional[str] = None
-    logo_url: Optional[str] = None
-    banner_url: Optional[str] = None
-    themes: Optional[List[str]] = None
-    technologies: Optional[List[str]] = None
-    total_prize_value: Optional[float] = None
-    currency: Optional[str] = None
-    team_size_min: Optional[int] = None
-    team_size_max: Optional[int] = None
-    is_featured: Optional[bool] = None
-    is_active: Optional[bool] = None
+    title: str | None = None
+    description: str | None = None
+    short_description: str | None = None
+    opportunity_type: str | None = None
+    format: str | None = None
+    location_type: str | None = None
+    location_city: str | None = None
+    location_country: str | None = None
+    website_url: str | None = None
+    registration_url: str | None = None
+    logo_url: str | None = None
+    banner_url: str | None = None
+    themes: list[str] | None = None
+    technologies: list[str] | None = None
+    total_prize_value: float | None = None
+    currency: str | None = None
+    team_size_min: int | None = None
+    team_size_max: int | None = None
+    is_featured: bool | None = None
+    is_active: bool | None = None
 
 
 class BulkActionRequest(BaseModel):
     """Schema for bulk actions on opportunities."""
 
-    action: Literal["activate", "deactivate", "delete"]
-    ids: List[str]
+    action: str = Field(..., pattern="^(activate|deactivate|delete)$")
+    ids: list[str] = Field(..., max_length=MAX_BULK_IDS)
 
 
 class BulkActionResponse(BaseModel):
@@ -99,15 +156,15 @@ class ImportResponse(BaseModel):
     imported: int
     failed: int
     skipped: int
-    errors: List[dict]
+    errors: list[dict[str, str | int]]
 
 
 class UserUpdate(BaseModel):
     """Schema for updating a user."""
 
-    is_active: Optional[bool] = None
-    is_superuser: Optional[bool] = None
-    full_name: Optional[str] = None
+    is_active: bool | None = None
+    is_superuser: bool | None = None
+    full_name: str | None = None
 
 
 class AnalyticsOverview(BaseModel):
@@ -117,7 +174,7 @@ class AnalyticsOverview(BaseModel):
     user_count: int
     match_count: int
     pipeline_count: int
-    opportunities_by_type: dict
+    opportunities_by_type: dict[str, int]
     recent_signups: int
 
 
@@ -125,10 +182,19 @@ class CrawlerStatus(BaseModel):
     """Status of a crawler."""
 
     name: str
-    last_run: Optional[datetime] = None
-    last_status: Optional[str] = None
+    last_run: datetime | None = None
+    last_status: str | None = None
     total_runs: int
     success_rate: float
+
+
+class PaginatedResponse(BaseModel):
+    """Generic paginated response."""
+
+    items: list[Any]
+    total: int
+    skip: int
+    limit: int
 
 
 # =============================================================================
@@ -138,22 +204,23 @@ class CrawlerStatus(BaseModel):
 
 @admin_router.get("/opportunities")
 async def list_opportunities(
-    category: Optional[str] = Query(None, description="Filter by opportunity type"),
-    search: Optional[str] = Query(None, description="Search in title"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    category: str | None = Query(None, description="Filter by opportunity type"),
+    search: str | None = Query(None, description="Search in title", max_length=MAX_SEARCH_LENGTH),
+    is_active: bool | None = Query(None, description="Filter by active status"),
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
     _admin: User = Depends(require_admin),
-):
+) -> dict[str, Any]:
     """List all opportunities with filters (admin only)."""
-    query = {}
+    query: dict[str, Any] = {}
 
     if category:
         query["opportunity_type"] = category
     if is_active is not None:
         query["is_active"] = is_active
     if search:
-        query["title"] = {"$regex": search, "$options": "i"}
+        # Escape regex to prevent NoSQL injection
+        query["title"] = {"$regex": escape_regex(search), "$options": "i"}
 
     opportunities = await Opportunity.find(query).skip(skip).limit(limit).to_list()
     total = await Opportunity.find(query).count()
@@ -170,7 +237,7 @@ async def list_opportunities(
 async def create_opportunity(
     data: OpportunityCreate,
     _admin: User = Depends(require_admin),
-):
+) -> Opportunity:
     """Create a new opportunity (admin only)."""
     # Check for duplicate external_id
     existing = await Opportunity.find_one(Opportunity.external_id == data.external_id)
@@ -184,14 +251,8 @@ async def create_opportunity(
     await opportunity.insert()
 
     logger.info(
-        "admin_action",
-        extra={
-            "action": "opportunity_created",
-            "admin_id": str(_admin.id),
-            "admin_email": _admin.email,
-            "target_id": str(opportunity.id),
-            "timestamp": datetime.utcnow().isoformat(),
-        },
+        f"Admin {_admin.email} created opportunity {opportunity.id}",
+        extra={"action": "opportunity_created", "admin_id": str(_admin.id), "target_id": str(opportunity.id)},
     )
 
     return opportunity
@@ -201,23 +262,9 @@ async def create_opportunity(
 async def get_opportunity(
     opportunity_id: str,
     _admin: User = Depends(require_admin),
-):
+) -> Opportunity:
     """Get opportunity by ID (admin only)."""
-    try:
-        opportunity = await Opportunity.get(PydanticObjectId(opportunity_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Opportunity not found",
-        )
-
-    if not opportunity:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Opportunity not found",
-        )
-
-    return opportunity
+    return await get_or_404(Opportunity, opportunity_id, "Opportunity")
 
 
 @admin_router.patch("/opportunities/{opportunity_id}")
@@ -225,25 +272,13 @@ async def update_opportunity(
     opportunity_id: str,
     data: OpportunityUpdate,
     _admin: User = Depends(require_admin),
-):
+) -> Opportunity:
     """Update an opportunity (partial update, admin only)."""
-    try:
-        opportunity = await Opportunity.get(PydanticObjectId(opportunity_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Opportunity not found",
-        )
-
-    if not opportunity:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Opportunity not found",
-        )
+    opportunity = await get_or_404(Opportunity, opportunity_id, "Opportunity")
 
     # Apply updates
     update_data = data.model_dump(exclude_unset=True)
-    update_data["updated_at"] = datetime.utcnow()
+    update_data["updated_at"] = utc_now()
 
     for field, value in update_data.items():
         setattr(opportunity, field, value)
@@ -251,14 +286,8 @@ async def update_opportunity(
     await opportunity.save()
 
     logger.info(
-        "admin_action",
-        extra={
-            "action": "opportunity_updated",
-            "admin_id": str(_admin.id),
-            "admin_email": _admin.email,
-            "target_id": str(opportunity.id),
-            "timestamp": datetime.utcnow().isoformat(),
-        },
+        f"Admin {_admin.email} updated opportunity {opportunity.id}",
+        extra={"action": "opportunity_updated", "admin_id": str(_admin.id), "target_id": str(opportunity.id)},
     )
 
     return opportunity
@@ -269,40 +298,22 @@ async def delete_opportunity(
     opportunity_id: str,
     hard: bool = Query(False, description="Perform hard delete instead of soft delete"),
     _admin: User = Depends(require_admin),
-):
+) -> dict[str, Any]:
     """Delete an opportunity (soft delete by default, admin only)."""
-    try:
-        opportunity = await Opportunity.get(PydanticObjectId(opportunity_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Opportunity not found",
-        )
-
-    if not opportunity:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Opportunity not found",
-        )
+    opportunity = await get_or_404(Opportunity, opportunity_id, "Opportunity")
 
     if hard:
         await opportunity.delete()
         action = "opportunity_hard_deleted"
     else:
         opportunity.is_active = False
-        opportunity.updated_at = datetime.utcnow()
+        opportunity.updated_at = utc_now()
         await opportunity.save()
         action = "opportunity_soft_deleted"
 
     logger.info(
-        "admin_action",
-        extra={
-            "action": action,
-            "admin_id": str(_admin.id),
-            "admin_email": _admin.email,
-            "target_id": str(opportunity_id),
-            "timestamp": datetime.utcnow().isoformat(),
-        },
+        f"Admin {_admin.email} {action.replace('_', ' ')} {opportunity_id}",
+        extra={"action": action, "admin_id": str(_admin.id), "target_id": str(opportunity_id)},
     )
 
     return {"ok": True, "action": action}
@@ -312,18 +323,37 @@ async def delete_opportunity(
 async def import_opportunities(
     file: UploadFile = File(...),
     _admin: User = Depends(require_admin),
-):
+) -> ImportResponse:
     """Bulk import opportunities from CSV or JSON file (admin only)."""
+    # Check file size before reading
+    file.file.seek(0, 2)  # Seek to end
+    size = file.file.tell()
+    file.file.seek(0)  # Reset to beginning
+
+    if size > MAX_IMPORT_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File too large. Maximum size is {MAX_IMPORT_SIZE // (1024 * 1024)}MB",
+        )
+
+    # Validate file extension (case-insensitive)
+    filename = file.filename or ""
+    if not filename.lower().endswith((".json", ".csv")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be .json or .csv",
+        )
+
     content = await file.read()
     content_str = content.decode("utf-8")
 
     imported = 0
     failed = 0
     skipped = 0
-    errors = []
+    errors: list[dict[str, str | int]] = []
 
     # Determine file type and parse
-    if file.filename.endswith(".json"):
+    if filename.lower().endswith(".json"):
         try:
             data = json.loads(content_str)
             if not isinstance(data, list):
@@ -333,7 +363,7 @@ async def import_opportunities(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid JSON: {str(e)}",
             )
-    elif file.filename.endswith(".csv"):
+    else:  # .csv
         try:
             reader = csv.DictReader(io.StringIO(content_str))
             data = list(reader)
@@ -342,11 +372,13 @@ async def import_opportunities(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid CSV: {str(e)}",
             )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be .json or .csv",
-        )
+
+    # Bulk lookup for duplicates (optimization: 1 query instead of N)
+    external_ids = [row.get("external_id") for row in data if row.get("external_id")]
+    existing_docs = await Opportunity.find({"external_id": {"$in": external_ids}}).to_list()
+    existing_ids = {doc.external_id for doc in existing_docs}
+
+    opportunities_to_insert = []
 
     for row_num, row in enumerate(data, start=1):
         try:
@@ -362,10 +394,7 @@ async def import_opportunities(
                 continue
 
             # Check for duplicate
-            existing = await Opportunity.find_one(
-                Opportunity.external_id == row["external_id"]
-            )
-            if existing:
+            if row["external_id"] in existing_ids:
                 skipped += 1
                 continue
 
@@ -394,24 +423,25 @@ async def import_opportunities(
                 total_prize_value=float(row["total_prize_value"]) if row.get("total_prize_value") else None,
                 is_active=True,
             )
-            await opportunity.insert()
-            imported += 1
+            opportunities_to_insert.append(opportunity)
+            # Track this ID as now "existing" to handle duplicates within the same file
+            existing_ids.add(row["external_id"])
 
-        except Exception as e:
-            errors.append({"row": row_num, "error": str(e)})
+        except ValueError as e:
+            errors.append({"row": row_num, "error": f"Value error: {str(e)}"})
+            failed += 1
+        except KeyError as e:
+            errors.append({"row": row_num, "error": f"Missing field: {str(e)}"})
             failed += 1
 
+    # Bulk insert all at once (optimization: 1 operation instead of N)
+    if opportunities_to_insert:
+        await Opportunity.insert_many(opportunities_to_insert)
+        imported = len(opportunities_to_insert)
+
     logger.info(
-        "admin_action",
-        extra={
-            "action": "opportunities_imported",
-            "admin_id": str(_admin.id),
-            "admin_email": _admin.email,
-            "imported": imported,
-            "failed": failed,
-            "skipped": skipped,
-            "timestamp": datetime.utcnow().isoformat(),
-        },
+        f"Admin {_admin.email} imported {imported} opportunities ({failed} failed, {skipped} skipped)",
+        extra={"action": "opportunities_imported", "admin_id": str(_admin.id), "imported": imported},
     )
 
     return ImportResponse(imported=imported, failed=failed, skipped=skipped, errors=errors)
@@ -421,43 +451,47 @@ async def import_opportunities(
 async def bulk_action_opportunities(
     data: BulkActionRequest,
     _admin: User = Depends(require_admin),
-):
+) -> BulkActionResponse:
     """Perform bulk actions on opportunities (admin only)."""
-    affected = 0
+    # Convert string IDs to ObjectIds, tracking failures
+    valid_ids = []
     failed = 0
 
     for opp_id in data.ids:
         try:
-            opportunity = await Opportunity.get(PydanticObjectId(opp_id))
-            if not opportunity:
-                failed += 1
-                continue
-
-            if data.action == "activate":
-                opportunity.is_active = True
-                opportunity.updated_at = datetime.utcnow()
-                await opportunity.save()
-            elif data.action == "deactivate":
-                opportunity.is_active = False
-                opportunity.updated_at = datetime.utcnow()
-                await opportunity.save()
-            elif data.action == "delete":
-                await opportunity.delete()
-
-            affected += 1
-        except Exception:
+            valid_ids.append(PydanticObjectId(opp_id))
+        except InvalidId:
             failed += 1
 
+    if not valid_ids:
+        return BulkActionResponse(affected=0, failed=failed)
+
+    # Use MongoDB bulk operations instead of individual queries
+    if data.action == "activate":
+        result = await Opportunity.find({"_id": {"$in": valid_ids}}).update_many(
+            {"$set": {"is_active": True, "updated_at": utc_now()}}
+        )
+        affected = result.modified_count
+    elif data.action == "deactivate":
+        result = await Opportunity.find({"_id": {"$in": valid_ids}}).update_many(
+            {"$set": {"is_active": False, "updated_at": utc_now()}}
+        )
+        affected = result.modified_count
+    elif data.action == "delete":
+        result = await Opportunity.find({"_id": {"$in": valid_ids}}).delete()
+        affected = result.deleted_count
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid action: {data.action}",
+        )
+
+    # Calculate failed based on requested vs affected
+    failed += len(valid_ids) - affected
+
     logger.info(
-        "admin_action",
-        extra={
-            "action": f"bulk_{data.action}",
-            "admin_id": str(_admin.id),
-            "admin_email": _admin.email,
-            "affected": affected,
-            "failed": failed,
-            "timestamp": datetime.utcnow().isoformat(),
-        },
+        f"Admin {_admin.email} performed bulk {data.action} on {affected} opportunities",
+        extra={"action": f"bulk_{data.action}", "admin_id": str(_admin.id), "affected": affected},
     )
 
     return BulkActionResponse(affected=affected, failed=failed)
@@ -470,19 +504,20 @@ async def bulk_action_opportunities(
 
 @admin_router.get("/users")
 async def list_users(
-    search: Optional[str] = Query(None, description="Search by email"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    search: str | None = Query(None, description="Search by email", max_length=MAX_SEARCH_LENGTH),
+    is_active: bool | None = Query(None, description="Filter by active status"),
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
     _admin: User = Depends(require_admin),
-):
+) -> dict[str, Any]:
     """List all users (admin only)."""
-    query = {}
+    query: dict[str, Any] = {}
 
     if is_active is not None:
         query["is_active"] = is_active
     if search:
-        query["email"] = {"$regex": search, "$options": "i"}
+        # Escape regex to prevent NoSQL injection
+        query["email"] = {"$regex": escape_regex(search), "$options": "i"}
 
     users = await User.find(query).skip(skip).limit(limit).to_list()
     total = await User.find(query).count()
@@ -491,7 +526,7 @@ async def list_users(
     users_safe = []
     for user in users:
         user_dict = user.model_dump()
-        del user_dict["hashed_password"]
+        user_dict.pop("hashed_password", None)  # Safe removal
         users_safe.append(user_dict)
 
     return {
@@ -506,24 +541,11 @@ async def list_users(
 async def get_user(
     user_id: str,
     _admin: User = Depends(require_admin),
-):
+) -> dict[str, Any]:
     """Get user by ID (admin only)."""
-    try:
-        user = await User.get(PydanticObjectId(user_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
+    user = await get_or_404(User, user_id, "User")
     user_dict = user.model_dump()
-    del user_dict["hashed_password"]
+    user_dict.pop("hashed_password", None)
     return user_dict
 
 
@@ -532,21 +554,9 @@ async def update_user(
     user_id: str,
     data: UserUpdate,
     _admin: User = Depends(require_admin),
-):
+) -> dict[str, Any]:
     """Update a user (admin only)."""
-    try:
-        user = await User.get(PydanticObjectId(user_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+    user = await get_or_404(User, user_id, "User")
 
     # Prevent admin from demoting themselves
     if str(user.id) == str(_admin.id) and data.is_superuser is False:
@@ -557,7 +567,7 @@ async def update_user(
 
     # Apply updates
     update_data = data.model_dump(exclude_unset=True)
-    update_data["updated_at"] = datetime.utcnow()
+    update_data["updated_at"] = utc_now()
 
     for field, value in update_data.items():
         setattr(user, field, value)
@@ -565,19 +575,12 @@ async def update_user(
     await user.save()
 
     logger.info(
-        "admin_action",
-        extra={
-            "action": "user_updated",
-            "admin_id": str(_admin.id),
-            "admin_email": _admin.email,
-            "target_id": str(user.id),
-            "changes": list(update_data.keys()),
-            "timestamp": datetime.utcnow().isoformat(),
-        },
+        f"Admin {_admin.email} updated user {user.id}",
+        extra={"action": "user_updated", "admin_id": str(_admin.id), "target_id": str(user.id)},
     )
 
     user_dict = user.model_dump()
-    del user_dict["hashed_password"]
+    user_dict.pop("hashed_password", None)
     return user_dict
 
 
@@ -589,25 +592,30 @@ async def update_user(
 @admin_router.get("/analytics/overview", response_model=AnalyticsOverview)
 async def get_analytics_overview(
     _admin: User = Depends(require_admin),
-):
+) -> AnalyticsOverview:
     """Get overview analytics (admin only)."""
-    opportunity_count = await Opportunity.find().count()
-    user_count = await User.find().count()
-    match_count = await Match.find().count()
-    pipeline_count = await Pipeline.find().count()
+    seven_days_ago = utc_now() - timedelta(days=7)
 
-    # Opportunities by type
-    pipeline = [
-        {"$group": {"_id": "$opportunity_type", "count": {"$sum": 1}}},
-    ]
-    type_results = await Opportunity.aggregate(pipeline).to_list()
+    # Run all counts in parallel for better performance
+    (
+        opportunity_count,
+        user_count,
+        match_count,
+        pipeline_count,
+        recent_signups,
+        type_results,
+    ) = await asyncio.gather(
+        Opportunity.find().count(),
+        User.find().count(),
+        Match.find().count(),
+        Pipeline.find().count(),
+        User.find(User.created_at >= seven_days_ago).count(),
+        Opportunity.aggregate([
+            {"$group": {"_id": "$opportunity_type", "count": {"$sum": 1}}}
+        ]).to_list(),
+    )
+
     opportunities_by_type = {r["_id"]: r["count"] for r in type_results if r["_id"]}
-
-    # Recent signups (last 7 days)
-    from datetime import timedelta
-
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
-    recent_signups = await User.find(User.created_at >= seven_days_ago).count()
 
     return AnalyticsOverview(
         opportunity_count=opportunity_count,
@@ -627,34 +635,41 @@ async def get_analytics_overview(
 @admin_router.get("/crawlers")
 async def list_crawlers(
     _admin: User = Depends(require_admin),
-):
+) -> dict[str, list[CrawlerStatus]]:
     """List all crawlers with their status (admin only)."""
-    # Get available scrapers
-    scrapers = ["devpost", "mlh", "ethglobal", "kaggle", "hackerearth"]
+    # Get available scrapers dynamically from registry
+    scrapers = ScraperRegistry.list_all()
+
+    # Use aggregation to get all stats in ONE query instead of N*3 queries
+    pipeline = [
+        {"$match": {"scraper_name": {"$in": scrapers}}},
+        {"$sort": {"started_at": -1}},
+        {"$group": {
+            "_id": "$scraper_name",
+            "latest_run": {"$first": "$$ROOT"},
+            "total_runs": {"$sum": 1},
+            "success_runs": {"$sum": {"$cond": [{"$eq": ["$status", "success"]}, 1, 0]}},
+        }},
+    ]
+    results = await ScraperRun.aggregate(pipeline).to_list()
+
+    # Build response from aggregation results
+    stats_map = {r["_id"]: r for r in results}
 
     crawler_statuses = []
     for scraper_name in scrapers:
-        # Get latest run for this scraper
-        latest_run = await ScraperRun.find(
-            ScraperRun.scraper_name == scraper_name
-        ).sort("-started_at").first_or_none()
-
-        # Get total runs and success rate
-        total_runs = await ScraperRun.find(ScraperRun.scraper_name == scraper_name).count()
-        success_runs = await ScraperRun.find(
-            ScraperRun.scraper_name == scraper_name,
-            ScraperRun.status == "success",
-        ).count()
-
-        success_rate = (success_runs / total_runs * 100) if total_runs > 0 else 0
+        stats = stats_map.get(scraper_name, {})
+        total = stats.get("total_runs", 0)
+        success = stats.get("success_runs", 0)
+        latest = stats.get("latest_run")
 
         crawler_statuses.append(
             CrawlerStatus(
                 name=scraper_name,
-                last_run=latest_run.started_at if latest_run else None,
-                last_status=latest_run.status if latest_run else None,
-                total_runs=total_runs,
-                success_rate=round(success_rate, 1),
+                last_run=latest["started_at"] if latest else None,
+                last_status=latest["status"] if latest else None,
+                total_runs=total,
+                success_rate=round((success / total * 100) if total > 0 else 0, 1),
             )
         )
 
@@ -665,9 +680,9 @@ async def list_crawlers(
 async def trigger_crawler_run(
     scraper_name: str,
     _admin: User = Depends(require_admin),
-):
+) -> dict[str, Any]:
     """Trigger a crawler run (admin only). Returns job ID for polling."""
-    valid_scrapers = ["devpost", "mlh", "ethglobal", "kaggle", "hackerearth"]
+    valid_scrapers = ScraperRegistry.list_all()
 
     if scraper_name not in valid_scrapers:
         raise HTTPException(
@@ -696,15 +711,8 @@ async def trigger_crawler_run(
     await run.insert()
 
     logger.info(
-        "admin_action",
-        extra={
-            "action": "crawler_triggered",
-            "admin_id": str(_admin.id),
-            "admin_email": _admin.email,
-            "scraper_name": scraper_name,
-            "run_id": str(run.id),
-            "timestamp": datetime.utcnow().isoformat(),
-        },
+        f"Admin {_admin.email} triggered crawler {scraper_name}",
+        extra={"action": "crawler_triggered", "admin_id": str(_admin.id), "scraper_name": scraper_name},
     )
 
     # Note: Actual scraper execution would be handled by a background task
@@ -724,7 +732,7 @@ async def list_crawler_runs(
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
     _admin: User = Depends(require_admin),
-):
+) -> dict[str, Any]:
     """List run history for a crawler (admin only)."""
     runs = await ScraperRun.find(
         ScraperRun.scraper_name == scraper_name
@@ -745,17 +753,11 @@ async def get_crawler_run(
     scraper_name: str,
     run_id: str,
     _admin: User = Depends(require_admin),
-):
+) -> ScraperRun:
     """Get details of a specific crawler run (admin only)."""
-    try:
-        run = await ScraperRun.get(PydanticObjectId(run_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Run not found",
-        )
+    run = await get_or_404(ScraperRun, run_id, "Run")
 
-    if not run or run.scraper_name != scraper_name:
+    if run.scraper_name != scraper_name:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Run not found",

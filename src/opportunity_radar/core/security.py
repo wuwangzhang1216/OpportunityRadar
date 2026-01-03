@@ -80,7 +80,7 @@ def decode_token(token: str) -> Optional[dict[str, Any]]:
         )
         return payload
     except JWTError as e:
-        logger.error(f"JWT decode error: {e}, token[:50]: {token[:50]}...")
+        logger.error(f"JWT decode error: {e}")
         return None
 
 
@@ -102,7 +102,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    logger.debug(f"get_current_user called with token[:50]: {token[:50]}...")
+    logger.debug("get_current_user called")
 
     payload = decode_token(token)
     if payload is None:
@@ -132,12 +132,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 
-async def require_admin(user=Depends(get_current_user)):
+async def require_admin(user=Depends(get_current_user)) -> "User":
     """
     Dependency that requires admin (superuser) access.
 
     Use as a dependency on admin-only endpoints.
     """
+    from ..models.user import User
+
     if not user.is_superuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
