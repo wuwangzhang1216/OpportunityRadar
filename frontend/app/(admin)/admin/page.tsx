@@ -22,35 +22,35 @@ export default function AdminDashboard() {
   const stats = [
     {
       label: "Total Opportunities",
-      value: analytics?.opportunities?.total ?? "-",
+      value: analytics?.opportunity_count ?? "-",
       icon: Database,
       color: "bg-blue-500",
-      subtext: `${analytics?.opportunities?.active ?? 0} active`,
+      subtext: `${analytics?.recent_signups ?? 0} recent`,
     },
     {
       label: "Total Users",
-      value: analytics?.users?.total ?? "-",
+      value: analytics?.user_count ?? "-",
       icon: Users,
       color: "bg-green-500",
-      subtext: `${analytics?.users?.with_profiles ?? 0} with profiles`,
+      subtext: `${analytics?.recent_signups ?? 0} new this week`,
     },
     {
       label: "Total Matches",
-      value: analytics?.matches?.total ?? "-",
+      value: analytics?.match_count ?? "-",
       icon: TrendingUp,
       color: "bg-purple-500",
-      subtext: `${analytics?.matches?.interested ?? 0} interested`,
+      subtext: "User-opportunity pairs",
     },
     {
       label: "Pipeline Items",
-      value: analytics?.pipeline?.total ?? "-",
+      value: analytics?.pipeline_count ?? "-",
       icon: Activity,
       color: "bg-orange-500",
-      subtext: `${analytics?.pipeline?.won ?? 0} won`,
+      subtext: "Active tracking",
     },
   ];
 
-  const categoryBreakdown = analytics?.opportunities?.by_category || {};
+  const categoryBreakdown = analytics?.opportunities_by_type || {};
 
   return (
     <div className="space-y-8">
@@ -119,7 +119,7 @@ export default function AdminDashboard() {
           ) : (
             <div className="space-y-3">
               {Object.entries(categoryBreakdown).map(([category, count]) => {
-                const total = analytics?.opportunities?.total || 1;
+                const total = analytics?.opportunity_count || 1;
                 const percentage = Math.round((Number(count) / total) * 100);
                 return (
                   <div key={category} className="space-y-1">

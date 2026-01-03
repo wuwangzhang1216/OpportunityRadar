@@ -603,17 +603,20 @@ async def get_analytics_overview(
         match_count,
         pipeline_count,
         recent_signups,
-        type_results,
     ) = await asyncio.gather(
         Opportunity.find().count(),
         User.find().count(),
         Match.find().count(),
         Pipeline.find().count(),
         User.find(User.created_at >= seven_days_ago).count(),
-        Opportunity.aggregate([
-            {"$group": {"_id": "$opportunity_type", "count": {"$sum": 1}}}
-        ]).to_list(),
     )
+
+    # Run aggregation using Motor directly (Beanie aggregate has version issues)
+    collection = Opportunity.get_pymongo_collection()
+    cursor = collection.aggregate([
+        {"$group": {"_id": "$opportunity_type", "count": {"$sum": 1}}}
+    ])
+    type_results = await cursor.to_list(length=None)
 
     opportunities_by_type = {r["_id"]: r["count"] for r in type_results if r["_id"]}
 

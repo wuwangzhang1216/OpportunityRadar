@@ -266,9 +266,9 @@ export default function AdminOpportunities() {
                     />
                   </th>
                   <th className="p-4 text-left text-sm font-medium text-muted-foreground">Title</th>
-                  <th className="p-4 text-left text-sm font-medium text-muted-foreground">Category</th>
-                  <th className="p-4 text-left text-sm font-medium text-muted-foreground">Host</th>
-                  <th className="p-4 text-left text-sm font-medium text-muted-foreground">Deadline</th>
+                  <th className="p-4 text-left text-sm font-medium text-muted-foreground">Type</th>
+                  <th className="p-4 text-left text-sm font-medium text-muted-foreground">Location</th>
+                  <th className="p-4 text-left text-sm font-medium text-muted-foreground">Created</th>
                   <th className="p-4 text-left text-sm font-medium text-muted-foreground">Status</th>
                   <th className="p-4 text-left text-sm font-medium text-muted-foreground">Actions</th>
                 </tr>
@@ -291,30 +291,30 @@ export default function AdminOpportunities() {
                 ) : (
                   opportunities.map((opp) => (
                     <tr
-                      key={opp.id}
+                      key={opp._id}
                       className="border-b hover:bg-secondary/30 transition-colors"
                     >
                       <td className="p-4">
                         <input
                           type="checkbox"
-                          checked={selectedIds.includes(opp.id)}
-                          onChange={() => handleSelect(opp.id)}
+                          checked={selectedIds.includes(opp._id)}
+                          onChange={() => handleSelect(opp._id)}
                           className="rounded border-gray-300"
                         />
                       </td>
                       <td className="p-4">
                         <div className="max-w-xs truncate font-medium">{opp.title}</div>
-                        {opp.source && (
-                          <div className="text-xs text-muted-foreground">{opp.source}</div>
+                        {opp.source_url && (
+                          <div className="text-xs text-muted-foreground truncate max-w-xs">{opp.source_url}</div>
                         )}
                       </td>
                       <td className="p-4">
-                        <Badge className={categoryColors[opp.category] || "bg-gray-100 text-gray-700"}>
-                          {opp.category}
+                        <Badge className={categoryColors[opp.opportunity_type] || "bg-gray-100 text-gray-700"}>
+                          {opp.opportunity_type}
                         </Badge>
                       </td>
-                      <td className="p-4 text-sm">{opp.host_name || "-"}</td>
-                      <td className="p-4 text-sm">{formatDate(opp.deadline)}</td>
+                      <td className="p-4 text-sm">{opp.location_city || "-"}</td>
+                      <td className="p-4 text-sm">{formatDate(opp.created_at)}</td>
                       <td className="p-4">
                         <Badge variant={opp.is_active ? "default" : "secondary"}>
                           {opp.is_active ? "Active" : "Inactive"}
@@ -335,7 +335,7 @@ export default function AdminOpportunities() {
                             className="text-red-600 hover:bg-red-50"
                             onClick={() => {
                               if (confirm("Delete this opportunity?")) {
-                                deleteMutation.mutate(opp.id);
+                                deleteMutation.mutate(opp._id);
                               }
                             }}
                           >
@@ -386,7 +386,7 @@ export default function AdminOpportunities() {
           <EditModal
             opportunity={editingOpportunity}
             onClose={() => setEditingOpportunity(null)}
-            onSave={(data) => updateMutation.mutate({ id: editingOpportunity.id, data })}
+            onSave={(data) => updateMutation.mutate({ id: editingOpportunity._id, data })}
             isLoading={updateMutation.isPending}
           />
         )}
