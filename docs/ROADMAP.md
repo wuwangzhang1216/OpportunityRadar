@@ -19,7 +19,7 @@ This document tracks the implementation plan for OpportunityRadar's core feature
 | Feature | Plan | Status | Progress |
 |---------|------|--------|----------|
 | Opportunity Crawler | [P0-opportunity-crawler.md](./plans/P0-opportunity-crawler.md) | `COMPLETED` | 100% |
-| Admin Dashboard | [P0-admin-dashboard.md](./plans/P0-admin-dashboard.md) | `IN_PROGRESS` | 50% |
+| Admin Dashboard | [P0-admin-dashboard.md](./plans/P0-admin-dashboard.md) | `COMPLETE` | 100% |
 
 ### P1 - Core Experience
 

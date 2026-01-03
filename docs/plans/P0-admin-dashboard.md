@@ -1,8 +1,8 @@
 # P0: Admin Dashboard
 
 > **Priority**: P0 (Blocking)
-> **Status**: `IN_PROGRESS`
-> **Progress**: 50% (Backend complete, Frontend pending)
+> **Status**: `COMPLETE`
+> **Progress**: 100% (Backend + Simplified Frontend)
 > **Last Updated**: 2026-01-03
 
 ---
@@ -340,25 +340,24 @@ Recommendation: Start with option 1, implement option 2 if needed.
 - [x] Implement run history endpoints
 - [ ] Update scrapers to create ScraperRun records (deferred to crawler integration)
 
-### Phase 2: Frontend - Layout ← NEXT
+### Phase 2: Frontend - Simplified Admin ✅ COMPLETE
 
-- [ ] Create admin layout with sidebar
-- [ ] Add admin route protection (check `is_superuser`)
-- [ ] Create admin navigation
+Implemented a simplified admin frontend (per user request - internal use only):
 
-### Phase 3: Frontend - Opportunities
+- [x] Create admin layout with orange theme sidebar
+- [x] Add admin route protection (verify via API call to admin endpoint)
+- [x] Create admin navigation (Overview, Opportunities)
+- [x] Opportunities list page with CRUD table
+- [x] Search and category filter UI
+- [x] Edit opportunity modal (title, is_active toggle)
+- [x] Bulk import modal with drag-and-drop
+- [x] Bulk actions (activate, deactivate, delete)
+- [x] Analytics dashboard with stat cards and category breakdown
 
-- [ ] Opportunities list page with table
-- [ ] Search and filter UI
-- [ ] Create/edit opportunity form
-- [ ] Bulk import modal
-- [ ] Bulk actions
+### Phase 4: Deferred (CLI-only for now)
 
-### Phase 4: Frontend - Other
-
-- [ ] Crawler status page
-- [ ] Users list page
-- [ ] Analytics dashboard (simple stat cards)
+- [ ] Crawler management UI → Use CLI: `python scripts/run_crawler.py`
+- [ ] User management UI → Use CLI/MongoDB queries
 
 ---
 
@@ -453,3 +452,4 @@ Critical fixes applied:
 | 2026-01-03 | Initial plan created |
 | 2026-01-03 | Updated with review feedback: is_superuser, ScraperRun model, bootstrap script, PATCH endpoints, security considerations |
 | 2026-01-03 | Phase 1 (Backend) completed - 15 endpoints, ScraperRun model, admin auth, security/performance fixes merged (PR #1) |
+| 2026-01-03 | Phase 2 (Frontend) completed - Simplified admin UI with opportunities CRUD, bulk import, analytics dashboard |
