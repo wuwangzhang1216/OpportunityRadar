@@ -21,6 +21,7 @@ async def init_db():
     from ..models.match import Match
     from ..models.pipeline import Pipeline
     from ..models.material import Material
+    from ..models.scraper_run import ScraperRun
 
     await init_beanie(
         database=client[settings.mongodb_database],
@@ -32,6 +33,7 @@ async def init_db():
             Match,
             Pipeline,
             Material,
+            ScraperRun,
         ]
     )
 
