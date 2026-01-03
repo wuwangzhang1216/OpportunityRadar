@@ -214,6 +214,63 @@ class ApiClient {
     const response = await this.client.get("/onboarding/suggestions");
     return response.data;
   }
+
+  // Admin - Analytics
+  async getAdminAnalytics() {
+    const response = await this.client.get("/admin/analytics/overview");
+    return response.data;
+  }
+
+  // Admin - Opportunities
+  async getAdminOpportunities(params?: {
+    search?: string;
+    category?: string;
+    is_active?: boolean;
+    skip?: number;
+    limit?: number;
+  }) {
+    const response = await this.client.get("/admin/opportunities", { params });
+    return response.data;
+  }
+
+  async getAdminOpportunity(id: string) {
+    const response = await this.client.get(`/admin/opportunities/${id}`);
+    return response.data;
+  }
+
+  async createAdminOpportunity(data: any) {
+    const response = await this.client.post("/admin/opportunities", data);
+    return response.data;
+  }
+
+  async updateAdminOpportunity(id: string, data: any) {
+    const response = await this.client.patch(`/admin/opportunities/${id}`, data);
+    return response.data;
+  }
+
+  async deleteAdminOpportunity(id: string, hard: boolean = false) {
+    const response = await this.client.delete(`/admin/opportunities/${id}`, {
+      params: hard ? { hard: true } : undefined,
+    });
+    return response.data;
+  }
+
+  async bulkActionOpportunities(action: "activate" | "deactivate" | "delete", ids: string[]) {
+    const response = await this.client.post("/admin/opportunities/bulk-action", {
+      action,
+      ids,
+    });
+    return response.data;
+  }
+
+  async importOpportunities(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await this.client.post("/admin/opportunities/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();
