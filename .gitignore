@@ -96,5 +96,6 @@ out/
 .npm
 *.tsbuildinfo
 .claude/
+.playwright-mcp/
 CLAUDE.md
 AGENTS.md
