@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 # Add the project root to Python path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 logging.basicConfig(
     level=logging.INFO,
