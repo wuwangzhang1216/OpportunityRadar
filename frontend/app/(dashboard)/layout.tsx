@@ -30,6 +30,7 @@ const navItems = [
   { href: "/generator", label: "AI Generator", icon: Sparkles },
   { href: "/profile", label: "Profile", icon: User },
 ];
+const adminNavItem = { href: "/admin", label: "Admin", icon: Settings };
 
 export default function DashboardLayout({
   children,
@@ -43,6 +44,7 @@ export default function DashboardLayout({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
     // Wait for hydration to complete before doing anything
@@ -77,6 +79,25 @@ export default function DashboardLayout({
       router.push("/login");
     }
   }, [hasHydrated, authChecked, isLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (authChecked && isAuthenticated && isAdmin === null) {
+        try {
+          await apiClient.getAdminAnalytics();
+          setIsAdmin(true);
+        } catch (error: unknown) {
+          if (error && typeof error === "object" && "response" in error) {
+            setIsAdmin(false);
+            return;
+          }
+          console.error("Admin check failed:", error);
+          setIsAdmin(false);
+        }
+      }
+    };
+    checkAdminStatus();
+  }, [authChecked, isAuthenticated, isAdmin]);
 
   // Check onboarding status and redirect if not completed
   useEffect(() => {
@@ -129,6 +150,8 @@ export default function DashboardLayout({
     return null;
   }
 
+  const menuItems = isAdmin ? [...navItems, adminNavItem] : navItems;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
@@ -173,7 +196,7 @@ export default function DashboardLayout({
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto scrollbar-modern">
-            {navItems.map((item) => {
+            {menuItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link key={item.href} href={item.href}>
@@ -319,7 +342,7 @@ export default function DashboardLayout({
             >
               <div className="flex flex-col h-full pt-20 pb-4">
                 <nav className="flex-1 space-y-1 px-3">
-                  {navItems.map((item) => {
+                  {menuItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
                       <Link key={item.href} href={item.href}>
