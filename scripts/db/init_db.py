@@ -9,7 +9,7 @@ if sys.platform == "win32":
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 # Add project root to path
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
 import psycopg2

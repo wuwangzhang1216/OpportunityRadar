@@ -99,3 +99,8 @@ out/
 .playwright-mcp/
 CLAUDE.md
 AGENTS.md
+# Debug/temp files
+*_debug.html
+*_live.html
+*.tmp
+*.temp
