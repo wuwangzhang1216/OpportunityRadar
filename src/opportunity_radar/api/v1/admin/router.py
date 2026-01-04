@@ -767,3 +767,229 @@ async def get_crawler_run(
         )
 
     return run
+
+
+# =============================================================================
+# Embeddings Endpoints
+# =============================================================================
+
+
+class EmbeddingStatsResponse(BaseModel):
+    """Response for embedding statistics."""
+
+    total_opportunities: int
+    with_embeddings: int
+    without_embeddings: int
+    percentage_complete: float
+
+
+class GenerateEmbeddingsRequest(BaseModel):
+    """Request for generating embeddings."""
+
+    opportunity_ids: list[str] | None = Field(
+        None,
+        description="Specific opportunity IDs to generate embeddings for. If None, generates for all without embeddings.",
+        max_length=100,
+    )
+    force: bool = Field(
+        False,
+        description="Force regenerate even if embedding exists",
+    )
+    batch_size: int = Field(
+        50,
+        ge=1,
+        le=100,
+        description="Number of opportunities to process per batch",
+    )
+
+
+class GenerateEmbeddingsResponse(BaseModel):
+    """Response for embedding generation."""
+
+    total_processed: int
+    success: int
+    failed: int
+    skipped: int
+    errors: list[dict[str, str]]
+
+
+@admin_router.get("/embeddings/stats", response_model=EmbeddingStatsResponse)
+async def get_embedding_stats(
+    _admin: User = Depends(require_admin),
+) -> EmbeddingStatsResponse:
+    """Get embedding statistics for opportunities (admin only)."""
+    total = await Opportunity.find().count()
+    with_embeddings = await Opportunity.find(
+        Opportunity.embedding != None  # noqa: E711
+    ).count()
+    without_embeddings = total - with_embeddings
+
+    return EmbeddingStatsResponse(
+        total_opportunities=total,
+        with_embeddings=with_embeddings,
+        without_embeddings=without_embeddings,
+        percentage_complete=round((with_embeddings / total * 100) if total > 0 else 0, 2),
+    )
+
+
+@admin_router.post("/embeddings/generate", response_model=GenerateEmbeddingsResponse)
+async def generate_embeddings(
+    data: GenerateEmbeddingsRequest,
+    _admin: User = Depends(require_admin),
+) -> GenerateEmbeddingsResponse:
+    """Generate embeddings for opportunities (admin only).
+
+    This endpoint generates OpenAI text-embedding-3-small embeddings for opportunities.
+    If opportunity_ids is provided, only those opportunities are processed.
+    Otherwise, all opportunities without embeddings are processed.
+    """
+    from ....services.embedding_service import get_embedding_service
+
+    embedding_service = get_embedding_service()
+    errors: list[dict[str, str]] = []
+    success = 0
+    failed = 0
+    skipped = 0
+
+    # Build query
+    if data.opportunity_ids:
+        # Convert to ObjectIds
+        try:
+            object_ids = [PydanticObjectId(oid) for oid in data.opportunity_ids]
+        except InvalidId:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid opportunity ID format",
+            )
+        query = {"_id": {"$in": object_ids}}
+    else:
+        # Get all opportunities without embeddings (or all if force=True)
+        if data.force:
+            query = {}
+        else:
+            query = {"embedding": None}
+
+    # Fetch opportunities in batches
+    opportunities = await Opportunity.find(query).limit(1000).to_list()
+
+    if not opportunities:
+        return GenerateEmbeddingsResponse(
+            total_processed=0,
+            success=0,
+            failed=0,
+            skipped=0,
+            errors=[],
+        )
+
+    # Convert to dicts for batch processing
+    opp_dicts = []
+    for opp in opportunities:
+        if not data.force and opp.embedding is not None:
+            skipped += 1
+            continue
+        opp_dicts.append({
+            "id": str(opp.id),
+            "title": opp.title,
+            "description": opp.description,
+            "short_description": opp.short_description,
+            "themes": opp.themes,
+            "technologies": opp.technologies,
+            "category": opp.opportunity_type,
+        })
+
+    if not opp_dicts:
+        return GenerateEmbeddingsResponse(
+            total_processed=len(opportunities),
+            success=0,
+            failed=0,
+            skipped=skipped,
+            errors=[],
+        )
+
+    # Generate embeddings in batch
+    results, stats = embedding_service.generate_opportunity_embeddings_batch(
+        opp_dicts,
+        batch_size=data.batch_size,
+    )
+
+    # Update opportunities with embeddings
+    for result in results:
+        if result.success:
+            try:
+                opp_id = PydanticObjectId(result.id)
+                await Opportunity.find_one({"_id": opp_id}).update(
+                    {"$set": {"embedding": result.embedding, "updated_at": utc_now()}}
+                )
+                success += 1
+            except Exception as e:
+                failed += 1
+                errors.append({"id": result.id, "error": f"Failed to save: {str(e)}"})
+        else:
+            failed += 1
+            errors.append({"id": result.id, "error": result.error or "Unknown error"})
+
+    logger.info(
+        f"Admin {_admin.email} generated embeddings: {success} success, {failed} failed, {skipped} skipped",
+        extra={
+            "action": "embeddings_generated",
+            "admin_id": str(_admin.id),
+            "success": success,
+            "failed": failed,
+        },
+    )
+
+    return GenerateEmbeddingsResponse(
+        total_processed=len(opportunities),
+        success=success,
+        failed=failed,
+        skipped=skipped,
+        errors=errors[:50],  # Limit errors in response
+    )
+
+
+@admin_router.post("/opportunities/{opportunity_id}/embedding")
+async def generate_single_embedding(
+    opportunity_id: str,
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    """Generate embedding for a single opportunity (admin only)."""
+    from ....services.embedding_service import get_embedding_service
+
+    opportunity = await get_or_404(Opportunity, opportunity_id, "Opportunity")
+    embedding_service = get_embedding_service()
+
+    result = embedding_service.generate_opportunity_embedding(
+        opportunity_id=str(opportunity.id),
+        title=opportunity.title,
+        description=opportunity.description,
+        tags=opportunity.themes,
+        tech_stack=opportunity.technologies,
+        category=opportunity.opportunity_type,
+    )
+
+    if not result.success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate embedding: {result.error}",
+        )
+
+    # Save embedding
+    opportunity.embedding = result.embedding
+    opportunity.updated_at = utc_now()
+    await opportunity.save()
+
+    logger.info(
+        f"Admin {_admin.email} generated embedding for opportunity {opportunity_id}",
+        extra={
+            "action": "embedding_generated",
+            "admin_id": str(_admin.id),
+            "target_id": opportunity_id,
+        },
+    )
+
+    return {
+        "ok": True,
+        "opportunity_id": opportunity_id,
+        "embedding_dimensions": len(result.embedding),
+        "text_length": result.text_length,
+    }
