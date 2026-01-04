@@ -1,5 +1,6 @@
 """Material generation endpoints."""
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,13 +9,21 @@ from beanie import PydanticObjectId
 from ....core.security import get_current_user
 from ....models.user import User
 from ....models.material import Material
+from ....models.opportunity import Opportunity
+from ....schemas.material import MaterialGenerateRequest, MaterialResponse
+from ....ai.generator import (
+    get_material_generator,
+    ProjectContext,
+    OpportunityContext,
+)
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/generate")
+@router.post("/generate", response_model=MaterialResponse, status_code=status.HTTP_201_CREATED)
 async def generate_materials(
-    request: dict,
+    request: MaterialGenerateRequest,
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -26,12 +35,96 @@ async def generate_materials(
     - demo_script: Live demo script
     - qa_pred: Predicted Q&A for judges
     """
-    # TODO: Implement AI generation service
-    # For now, return a placeholder response
-    return {
-        "message": "Material generation not yet implemented",
-        "request": request,
+    logger.info(
+        f"Material generation requested by user={current_user.id}, "
+        f"targets={request.targets}"
+    )
+
+    # Get opportunity context (optional)
+    opportunity = None
+    opp_context = OpportunityContext(title="General Project", themes=[])
+
+    if request.opportunity_id:
+        try:
+            opportunity = await Opportunity.get(PydanticObjectId(request.opportunity_id))
+            if opportunity:
+                opp_context = OpportunityContext(
+                    title=opportunity.title,
+                    themes=opportunity.tags or [],
+                )
+        except Exception as e:
+            logger.warning(f"Could not fetch opportunity {request.opportunity_id}: {e}")
+
+    # Build project context from request
+    project = ProjectContext(
+        name=request.project_info.name,
+        problem=request.project_info.problem,
+        solution=request.project_info.solution,
+        tech_stack=request.project_info.tech_stack,
+        demo_url=request.project_info.demo_url,
+    )
+
+    # Get generator and generate materials
+    generator = get_material_generator()
+
+    try:
+        results = await generator.generate_all(
+            project=project,
+            opportunity=opp_context,
+            targets=request.targets,
+            constraints={
+                "highlight_demo": request.constraints.highlight_demo,
+                "include_user_evidence": request.constraints.include_user_evidence,
+                "time_limit_min": request.constraints.time_limit_min,
+            } if request.constraints else None,
+        )
+    except Exception as e:
+        logger.error(f"Material generation failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"AI generation service error: {str(e)}",
+        )
+
+    # Build response and save materials to MongoDB
+    response_data = {
+        "readme_md": None,
+        "pitch_md": None,
+        "demo_script_md": None,
+        "qa_pred_md": None,
+        "metadata": {"targets": request.targets, "project_name": request.project_info.name},
     }
+
+    for target, result in results.items():
+        # Check if generation had an error
+        if result.metadata and result.metadata.get("error"):
+            logger.warning(f"Generation error for {target}: {result.metadata.get('error')}")
+            continue
+
+        # Save to MongoDB
+        material = Material(
+            user_id=current_user.id,
+            opportunity_id=opportunity.id if opportunity else None,
+            material_type=target,
+            content=result.content,
+            metadata=result.metadata or {},
+            model_used="gpt-4o-mini",
+        )
+        await material.insert()
+
+        # Map to response fields
+        if target == "readme":
+            response_data["readme_md"] = result.content
+        elif target.startswith("pitch"):
+            response_data["pitch_md"] = result.content
+        elif target == "demo_script":
+            response_data["demo_script_md"] = result.content
+        elif target == "qa_pred":
+            response_data["qa_pred_md"] = result.content
+
+        response_data["metadata"][f"{target}_id"] = str(material.id)
+
+    logger.info(f"Material generation completed for user={current_user.id}")
+    return MaterialResponse(**response_data)
 
 
 @router.get("")

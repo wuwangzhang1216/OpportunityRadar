@@ -10,7 +10,6 @@ from .mongo_matching_service import (
     recompute_all_matches_mongo,
 )
 from .profile_service import ProfileService
-from .material_service import MaterialService
 from .pipeline_service import PipelineService
 
 __all__ = [
@@ -26,6 +25,5 @@ __all__ = [
     "get_mongo_matching_service",
     "recompute_all_matches_mongo",
     "ProfileService",
-    "MaterialService",
     "PipelineService",
 ]
