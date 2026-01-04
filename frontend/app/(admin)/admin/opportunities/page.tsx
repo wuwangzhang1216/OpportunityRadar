@@ -39,11 +39,14 @@ interface Opportunity {
   id: string;
   title: string;
   category: string;
+  opportunity_type?: string;
   host_name?: string;
   deadline?: string;
   prize_pool?: string;
   is_active: boolean;
   source?: string;
+  source_url?: string;
+  location_city?: string;
   created_at?: string;
 }
 
@@ -291,14 +294,14 @@ export default function AdminOpportunities() {
                 ) : (
                   opportunities.map((opp) => (
                     <tr
-                      key={opp._id}
+                      key={opp.id}
                       className="border-b hover:bg-secondary/30 transition-colors"
                     >
                       <td className="p-4">
                         <input
                           type="checkbox"
-                          checked={selectedIds.includes(opp._id)}
-                          onChange={() => handleSelect(opp._id)}
+                          checked={selectedIds.includes(opp.id)}
+                          onChange={() => handleSelect(opp.id)}
                           className="rounded border-gray-300"
                         />
                       </td>
@@ -309,8 +312,8 @@ export default function AdminOpportunities() {
                         )}
                       </td>
                       <td className="p-4">
-                        <Badge className={categoryColors[opp.opportunity_type] || "bg-gray-100 text-gray-700"}>
-                          {opp.opportunity_type}
+                        <Badge className={opp.opportunity_type ? categoryColors[opp.opportunity_type] || "bg-gray-100 text-gray-700" : "bg-gray-100 text-gray-700"}>
+                          {opp.opportunity_type || "-"}
                         </Badge>
                       </td>
                       <td className="p-4 text-sm">{opp.location_city || "-"}</td>
@@ -335,7 +338,7 @@ export default function AdminOpportunities() {
                             className="text-red-600 hover:bg-red-50"
                             onClick={() => {
                               if (confirm("Delete this opportunity?")) {
-                                deleteMutation.mutate(opp._id);
+                                deleteMutation.mutate(opp.id);
                               }
                             }}
                           >
@@ -386,7 +389,7 @@ export default function AdminOpportunities() {
           <EditModal
             opportunity={editingOpportunity}
             onClose={() => setEditingOpportunity(null)}
-            onSave={(data) => updateMutation.mutate({ id: editingOpportunity._id, data })}
+            onSave={(data) => updateMutation.mutate({ id: editingOpportunity.id, data })}
             isLoading={updateMutation.isPending}
           />
         )}
