@@ -92,7 +92,7 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function GeneratorPage() {
   const searchParams = useSearchParams();
-  const batchId = searchParams.get("batch_id");
+  const opportunityId = searchParams.get("opportunity_id");
 
   const [selectedTypes, setSelectedTypes] = useState<string[]>(["readme"]);
   const [generatedContent, setGeneratedContent] = useState<Record<string, string>>({});
@@ -100,9 +100,9 @@ export default function GeneratorPage() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const { data: opportunity } = useQuery({
-    queryKey: ["opportunity", batchId],
-    queryFn: () => apiClient.getOpportunity(batchId!),
-    enabled: !!batchId,
+    queryKey: ["opportunity", opportunityId],
+    queryFn: () => apiClient.getOpportunity(opportunityId!),
+    enabled: !!opportunityId,
   });
 
   const {
@@ -122,7 +122,7 @@ export default function GeneratorPage() {
   const generateMutation = useMutation({
     mutationFn: (data: FormData) =>
       apiClient.generateMaterials({
-        batch_id: batchId || "default",
+        opportunity_id: opportunityId || undefined,
         targets: selectedTypes,
         project_info: {
           name: data.projectName,

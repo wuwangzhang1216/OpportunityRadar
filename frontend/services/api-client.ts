@@ -158,7 +158,7 @@ class ApiClient {
 
   // Materials
   async generateMaterials(data: {
-    batch_id: string;
+    opportunity_id?: string;
     targets: string[];
     project_info: {
       name: string;

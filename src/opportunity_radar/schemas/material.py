@@ -27,7 +27,10 @@ class GenerationConstraints(BaseModel):
 class MaterialGenerateRequest(BaseModel):
     """Schema for material generation request."""
 
-    batch_id: str
+    opportunity_id: Optional[str] = Field(
+        default=None,
+        description="Optional opportunity ID for context-aware generation",
+    )
     targets: List[str] = Field(
         default=["readme", "pitch_3min"],
         description="List of targets: readme, pitch_1min, pitch_3min, pitch_5min, demo_script, qa_pred",
