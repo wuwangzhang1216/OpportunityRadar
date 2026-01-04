@@ -2,6 +2,12 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { apiClient } from "@/services/api-client";
 
+const ssrStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
 interface User {
   id: string;
   email: string;
@@ -103,7 +109,9 @@ const useAuthStoreBase = create<AuthState>()(
     }),
     {
       name: "auth-storage",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() =>
+        typeof window !== "undefined" ? localStorage : ssrStorage
+      ),
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
