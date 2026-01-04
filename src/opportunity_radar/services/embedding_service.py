@@ -1,7 +1,8 @@
 """Embedding service for semantic search and matching."""
 
 import logging
-from typing import List, Optional
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 
 from openai import OpenAI
 
@@ -12,6 +13,21 @@ logger = logging.getLogger(__name__)
 # text-embedding-3-small outputs 1536 dimensions by default
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIMENSION = 1536
+
+# OpenAI API limits
+MAX_BATCH_SIZE = 2048  # Maximum texts per batch request
+MAX_TOKENS_PER_REQUEST = 8191  # Maximum tokens per text
+
+
+@dataclass
+class EmbeddingResult:
+    """Result of embedding generation."""
+
+    id: str
+    embedding: List[float]
+    text_length: int
+    success: bool = True
+    error: Optional[str] = None
 
 
 class EmbeddingService:
@@ -164,6 +180,179 @@ class EmbeddingService:
             parts.append(f"Industries: {', '.join(industry)}")
 
         return ". ".join(parts)
+
+    def generate_opportunity_embedding(
+        self,
+        opportunity_id: str,
+        title: str,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        tech_stack: Optional[List[str]] = None,
+        industry: Optional[List[str]] = None,
+        category: Optional[str] = None,
+    ) -> EmbeddingResult:
+        """
+        Generate embedding for a single opportunity.
+
+        Args:
+            opportunity_id: Unique ID of the opportunity
+            title: Opportunity title
+            description: Full description
+            tags: List of tags
+            tech_stack: Required technologies
+            industry: Related industries
+            category: Opportunity category
+
+        Returns:
+            EmbeddingResult with embedding vector or error
+        """
+        try:
+            text = self.create_opportunity_embedding_text(
+                title=title,
+                description=description,
+                tags=tags,
+                tech_stack=tech_stack,
+                industry=industry,
+                category=category,
+            )
+            embedding = self.get_embedding(text)
+            return EmbeddingResult(
+                id=opportunity_id,
+                embedding=embedding,
+                text_length=len(text),
+                success=True,
+            )
+        except Exception as e:
+            logger.error(f"Failed to generate embedding for opportunity {opportunity_id}: {e}")
+            return EmbeddingResult(
+                id=opportunity_id,
+                embedding=[],
+                text_length=0,
+                success=False,
+                error=str(e),
+            )
+
+    def generate_opportunity_embeddings_batch(
+        self,
+        opportunities: List[Dict],
+        batch_size: int = 100,
+    ) -> Tuple[List[EmbeddingResult], Dict]:
+        """
+        Generate embeddings for multiple opportunities in batches.
+
+        Args:
+            opportunities: List of opportunity dicts with keys:
+                - id: Opportunity ID
+                - title: Title
+                - description: Description (optional)
+                - tags: List of tags (optional)
+                - tech_stack/technologies: List of technologies (optional)
+                - industry/themes: List of industries (optional)
+                - category/opportunity_type: Category (optional)
+            batch_size: Number of opportunities per batch (default 100)
+
+        Returns:
+            Tuple of (results list, stats dict)
+        """
+        results = []
+        stats = {
+            "total": len(opportunities),
+            "success": 0,
+            "failed": 0,
+            "skipped": 0,
+        }
+
+        if not opportunities:
+            return results, stats
+
+        # Process in batches
+        for i in range(0, len(opportunities), batch_size):
+            batch = opportunities[i : i + batch_size]
+
+            # Prepare texts and IDs
+            texts = []
+            ids = []
+            text_lengths = []
+
+            for opp in batch:
+                opp_id = opp.get("id") or opp.get("_id")
+                if not opp_id:
+                    stats["skipped"] += 1
+                    continue
+
+                title = opp.get("title", "")
+                if not title:
+                    stats["skipped"] += 1
+                    results.append(
+                        EmbeddingResult(
+                            id=str(opp_id),
+                            embedding=[],
+                            text_length=0,
+                            success=False,
+                            error="Missing title",
+                        )
+                    )
+                    continue
+
+                # Handle different field naming conventions
+                description = opp.get("description") or opp.get("short_description")
+                tags = opp.get("tags") or opp.get("themes", [])
+                tech_stack = opp.get("tech_stack") or opp.get("technologies", [])
+                industry = opp.get("industry") or opp.get("themes", [])
+                category = opp.get("category") or opp.get("opportunity_type")
+
+                text = self.create_opportunity_embedding_text(
+                    title=title,
+                    description=description,
+                    tags=tags,
+                    tech_stack=tech_stack,
+                    industry=industry,
+                    category=category,
+                )
+
+                texts.append(text)
+                ids.append(str(opp_id))
+                text_lengths.append(len(text))
+
+            if not texts:
+                continue
+
+            # Generate embeddings for batch
+            try:
+                embeddings = self.get_embeddings_batch(texts)
+
+                for j, embedding in enumerate(embeddings):
+                    results.append(
+                        EmbeddingResult(
+                            id=ids[j],
+                            embedding=embedding,
+                            text_length=text_lengths[j],
+                            success=True,
+                        )
+                    )
+                    stats["success"] += 1
+
+            except Exception as e:
+                logger.error(f"Batch embedding failed: {e}")
+                # Mark all in this batch as failed
+                for j in range(len(texts)):
+                    results.append(
+                        EmbeddingResult(
+                            id=ids[j],
+                            embedding=[],
+                            text_length=text_lengths[j],
+                            success=False,
+                            error=str(e),
+                        )
+                    )
+                    stats["failed"] += 1
+
+            logger.info(
+                f"Processed batch {i // batch_size + 1}: "
+                f"{stats['success']} success, {stats['failed']} failed"
+            )
+
+        return results, stats
 
 
 # Singleton instance
