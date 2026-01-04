@@ -171,7 +171,7 @@ class ApiClient {
     return response.data;
   }
 
-  async getMaterials(params?: { batch_id?: string; material_type?: string }) {
+  async getMaterials(params?: { opportunity_id?: string; material_type?: string }) {
     const response = await this.client.get("/materials", { params });
     return response.data;
   }

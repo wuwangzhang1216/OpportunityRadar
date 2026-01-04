@@ -1,8 +1,9 @@
 """Material generation endpoints."""
 
 import logging
-from typing import Optional
+from typing import Optional, List
 
+from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from beanie import PydanticObjectId
 
@@ -10,7 +11,11 @@ from ....core.security import get_current_user
 from ....models.user import User
 from ....models.material import Material
 from ....models.opportunity import Opportunity
-from ....schemas.material import MaterialGenerateRequest, MaterialResponse
+from ....schemas.material import (
+    MaterialGenerateRequest,
+    MaterialResponse,
+    GenerationError,
+)
 from ....ai.generator import (
     get_material_generator,
     ProjectContext,
@@ -40,20 +45,42 @@ async def generate_materials(
         f"targets={request.targets}"
     )
 
-    # Get opportunity context (optional)
+    # Get opportunity context (optional) with authorization check
     opportunity = None
     opp_context = OpportunityContext(title="General Project", themes=[])
 
     if request.opportunity_id:
         try:
             opportunity = await Opportunity.get(PydanticObjectId(request.opportunity_id))
-            if opportunity:
-                opp_context = OpportunityContext(
-                    title=opportunity.title,
-                    themes=opportunity.tags or [],
-                )
+        except InvalidId:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid opportunity ID format",
+            )
         except Exception as e:
-            logger.warning(f"Could not fetch opportunity {request.opportunity_id}: {e}")
+            logger.error(f"Database error fetching opportunity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to validate opportunity",
+            )
+
+        if not opportunity:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Opportunity not found",
+            )
+
+        # Check if opportunity is active (authorization)
+        if not opportunity.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot generate materials for inactive opportunity",
+            )
+
+        opp_context = OpportunityContext(
+            title=opportunity.title,
+            themes=opportunity.tags or [],
+        )
 
     # Build project context from request
     project = ProjectContext(
@@ -82,7 +109,7 @@ async def generate_materials(
         logger.error(f"Material generation failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"AI generation service error: {str(e)}",
+            detail="AI generation service temporarily unavailable",
         )
 
     # Build response and save materials to MongoDB
@@ -93,11 +120,14 @@ async def generate_materials(
         "qa_pred_md": None,
         "metadata": {"targets": request.targets, "project_name": request.project_info.name},
     }
+    errors: List[GenerationError] = []
 
     for target, result in results.items():
-        # Check if generation had an error
+        # Check if generation had an error - track partial failures
         if result.metadata and result.metadata.get("error"):
-            logger.warning(f"Generation error for {target}: {result.metadata.get('error')}")
+            error_msg = result.metadata.get("error", "Unknown generation error")
+            logger.warning(f"Generation error for {target}: {error_msg}")
+            errors.append(GenerationError(target=target, error=error_msg))
             continue
 
         # Save to MongoDB
@@ -124,7 +154,7 @@ async def generate_materials(
         response_data["metadata"][f"{target}_id"] = str(material.id)
 
     logger.info(f"Material generation completed for user={current_user.id}")
-    return MaterialResponse(**response_data)
+    return MaterialResponse(**response_data, errors=errors)
 
 
 @router.get("")
@@ -140,7 +170,13 @@ async def list_materials(
     if material_type:
         query["material_type"] = material_type
     if opportunity_id:
-        query["opportunity_id"] = PydanticObjectId(opportunity_id)
+        try:
+            query["opportunity_id"] = PydanticObjectId(opportunity_id)
+        except InvalidId:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid opportunity ID format",
+            )
 
     materials = await Material.find(query).skip(skip).limit(limit).to_list()
 
@@ -170,6 +206,11 @@ async def get_material(
     """Get specific generated material with full content."""
     try:
         material = await Material.get(PydanticObjectId(material_id))
+    except InvalidId:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid material ID format",
+        )
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -202,6 +243,11 @@ async def delete_material(
     """Delete a generated material."""
     try:
         material = await Material.get(PydanticObjectId(material_id))
+    except InvalidId:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid material ID format",
+        )
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
