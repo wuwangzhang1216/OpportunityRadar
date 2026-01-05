@@ -148,7 +148,36 @@ class DemoAPITester:
             print(f"   ❌ 获取用户失败: {result.error}")
             return False
 
-    # ==================== 2. Dashboard 测试 ====================
+    # ==================== 2. Profile & Embedding 测试 ====================
+
+    async def test_get_profile(self) -> bool:
+        """测试获取 Profile"""
+        print("\n👤 测试获取用户 Profile...")
+        result = await self._request("GET", "/profiles/me", "获取 Profile")
+
+        if result.passed and result.data:
+            # API uses 'intents' for goals
+            intents = result.data.get('intents', [])
+            print(f"   ✅ 团队名: {result.data.get('team_name', 'N/A')}")
+            print(f"   ✅ 技术栈: {result.data.get('tech_stack', [])[:3]}...")
+            print(f"   ✅ 目标 (intents): {intents}")
+            print(f"   ✅ 行业: {result.data.get('industries', [])[:3]}...")
+            print(f"   ✅ 产品: {result.data.get('product_name', 'N/A')}")
+
+            # Validate goals are correct
+            expected_goals = ['prizes', 'funding', 'networking', 'learning', 'building']
+            if set(intents) == set(expected_goals):
+                print(f"   ✅ Goals 设置正确 (5个标准目标)")
+            elif len(intents) == 0:
+                print(f"   ⚠️ Goals 为空，可能需要重新设置")
+            else:
+                print(f"   ⚠️ Goals 可能不完整: {intents}")
+            return True
+        else:
+            print(f"   ❌ 获取 Profile 失败: {result.error}")
+            return False
+
+    # ==================== 3. Dashboard 测试 ====================
 
     async def test_matches_stats(self) -> bool:
         """测试匹配统计"""
@@ -277,6 +306,23 @@ class DemoAPITester:
                     if not self.opportunity_id:
                         self.opportunity_id = items[0].get("opportunity_id")
                     print(f"   ✅ 获取 match_id: {self.match_id[:8] if self.match_id else 'N/A'}...")
+
+                    # 显示前3个匹配的详细分数
+                    print(f"\n   📊 匹配分数详情 (前3个):")
+                    for i, match in enumerate(items[:3]):
+                        score = match.get("overall_score", 0)
+                        breakdown = match.get("score_breakdown", {})
+                        opp = match.get("opportunity", {})
+                        title = opp.get("title", "N/A")[:40] if opp else "N/A"
+
+                        print(f"   {i+1}. {title}...")
+                        print(f"      总分: {score:.1%}")
+                        if breakdown:
+                            print(f"      - 语义相似: {breakdown.get('semantic_score', 0):.1%}")
+                            print(f"      - 技术匹配: {breakdown.get('tech_overlap_score', 0):.1%}")
+                            print(f"      - 行业匹配: {breakdown.get('industry_alignment_score', 0):.1%}")
+                            print(f"      - 目标匹配: {breakdown.get('goals_alignment_score', 0):.1%}")
+                            print(f"      - 截止日期: {breakdown.get('deadline_score', 0):.1%}")
             return True
         else:
             print(f"   ❌ 获取匹配列表失败: {result.error}")
@@ -461,23 +507,7 @@ class DemoAPITester:
             print(f"   ❌ 生成材料失败: {result.error}")
             return False
 
-    # ==================== 7. Profile 测试 ====================
-
-    async def test_get_profile(self) -> bool:
-        """测试获取 Profile"""
-        print("\n👤 测试获取用户 Profile...")
-        result = await self._request("GET", "/profiles/me", "获取 Profile")
-
-        if result.passed and result.data:
-            print(f"   ✅ 显示名: {result.data.get('display_name', 'N/A')}")
-            print(f"   ✅ 技术栈: {result.data.get('tech_stack', [])[:3]}...")
-            print(f"   ✅ 团队名: {result.data.get('team_name', 'N/A')}")
-            return True
-        else:
-            print(f"   ❌ 获取 Profile 失败: {result.error}")
-            return False
-
-    # ==================== 8. 通知测试 ====================
+    # ==================== 7. 通知测试 ====================
 
     async def test_notifications(self) -> bool:
         """测试通知"""
@@ -526,54 +556,54 @@ class DemoAPITester:
             return False
         await self.test_get_me()
 
-        # 2. Dashboard 测试
+        # 2. Profile 测试
         print("\n" + "=" * 40)
-        print("【第二幕】Dashboard 测试")
+        print("【第二幕】Profile 测试")
+        print("=" * 40)
+        await self.test_get_profile()
+
+        # 3. Dashboard 测试
+        print("\n" + "=" * 40)
+        print("【第三幕】Dashboard 测试")
         print("=" * 40)
         await self.test_matches_stats()
         await self.test_top_matches()
         await self.test_pipeline_stats()
 
-        # 3. Opportunities 测试
+        # 4. Opportunities 测试
         print("\n" + "=" * 40)
-        print("【第三幕】Opportunities 测试")
+        print("【第四幕】Opportunities 测试")
         print("=" * 40)
         await self.test_list_opportunities()
         await self.test_filter_opportunities()
         await self.test_opportunity_detail()
 
-        # 4. Matches 测试
+        # 5. Matches 测试
         print("\n" + "=" * 40)
-        print("【第三幕续】Matches 测试")
+        print("【第五幕】Matches 测试")
         print("=" * 40)
         await self.test_list_matches()
         await self.test_bookmark_match()
         await self.test_unbookmark_match()
 
-        # 5. Pipeline 测试
+        # 6. Pipeline 测试
         print("\n" + "=" * 40)
-        print("【第四幕】Pipeline 测试")
+        print("【第六幕】Pipeline 测试")
         print("=" * 40)
         await self.test_list_pipelines()
         await self.test_create_pipeline()
         await self.test_update_pipeline_stage()
 
-        # 6. Materials 测试
+        # 7. Materials 测试
         print("\n" + "=" * 40)
-        print("【第五幕】Materials 测试 (AI 生成)")
+        print("【第七幕】Materials 测试 (AI 生成)")
         print("=" * 40)
         await self.test_list_materials()
         await self.test_generate_material()
 
-        # 7. Profile 测试
-        print("\n" + "=" * 40)
-        print("【第六幕】Profile 测试")
-        print("=" * 40)
-        await self.test_get_profile()
-
         # 8. 通知测试
         print("\n" + "=" * 40)
-        print("【附加】通知测试")
+        print("【第八幕】通知测试")
         print("=" * 40)
         await self.test_notifications()
         await self.test_unread_count()
