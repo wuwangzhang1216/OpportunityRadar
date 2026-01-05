@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Trophy, ArrowRight, Loader2, ExternalLink, Star } from "lucide-react";
+import Link from "next/link";
+import { Trophy, ArrowRight, Loader2, Star, Sparkles, Plus, Kanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,10 @@ export function Step3Matches() {
 
   const handleGoToDashboard = () => {
     router.push("/dashboard");
+  };
+
+  const handleGoToGenerator = () => {
+    router.push("/generator");
   };
 
   if (isLoadingMatches) {
@@ -43,7 +48,7 @@ export function Step3Matches() {
       {topMatches.length > 0 ? (
         <div className="space-y-3">
           <h3 className="font-medium text-gray-700">Your Top Matches</h3>
-          {topMatches.map((match, index) => (
+          {topMatches.slice(0, 3).map((match, index) => (
             <Card key={match.id} variant="elevated" className="overflow-hidden">
               <CardContent className="p-4">
                 <div className="flex items-start gap-4">
@@ -91,11 +96,29 @@ export function Step3Matches() {
                         ))}
                       </div>
                     )}
+
+                    {/* Quick actions for first match */}
+                    {index === 0 && (
+                      <div className="mt-3 flex gap-2">
+                        <Link href={`/generator?batch_id=${match.batch_id || match.id}`}>
+                          <Button size="sm" variant="outline" className="text-xs">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            Generate Materials
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
+
+          {topMatches.length > 3 && (
+            <p className="text-center text-sm text-gray-500">
+              +{topMatches.length - 3} more matches in your dashboard
+            </p>
+          )}
         </div>
       ) : (
         <Card variant="outline" className="text-center py-8">
@@ -107,14 +130,69 @@ export function Step3Matches() {
         </Card>
       )}
 
-      {/* CTA */}
-      <Button className="w-full" size="lg" onClick={handleGoToDashboard}>
-        Go to Dashboard
-        <ArrowRight className="h-4 w-4 ml-2" />
-      </Button>
+      {/* What's Next Section */}
+      <Card className="bg-gradient-to-r from-primary/5 to-purple-500/5 border-primary/20">
+        <CardContent className="py-5">
+          <h3 className="font-semibold text-gray-900 mb-3">What's Next?</h3>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-bold text-primary">1</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Add opportunities to your Pipeline</p>
+                <p className="text-xs text-gray-500">Track your progress from discovery to victory</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-bold text-primary">2</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Generate application materials with AI</p>
+                <p className="text-xs text-gray-500">Create README, pitch decks, and demo scripts instantly</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-bold text-primary">3</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Submit and track your applications</p>
+                <p className="text-xs text-gray-500">Stay organized with deadline reminders</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* CTAs */}
+      <div className="space-y-3">
+        <Button className="w-full" size="lg" onClick={handleGoToDashboard}>
+          Go to Dashboard
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
+
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={handleGoToGenerator}
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Try AI Generator
+          </Button>
+          <Link href="/pipeline" className="flex-1">
+            <Button variant="outline" className="w-full">
+              <Kanban className="h-4 w-4 mr-2" />
+              View Pipeline
+            </Button>
+          </Link>
+        </div>
+      </div>
 
       <p className="text-center text-sm text-gray-500">
-        You can view all your matches and explore more opportunities in the dashboard
+        You can always access all features from the sidebar menu
       </p>
     </div>
   );

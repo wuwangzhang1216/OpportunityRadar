@@ -91,7 +91,8 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function GeneratorPage() {
   const searchParams = useSearchParams();
-  const opportunityId = searchParams.get("opportunity_id");
+  // Support both batch_id and opportunity_id for backwards compatibility
+  const opportunityId = searchParams.get("batch_id") || searchParams.get("opportunity_id");
 
   const [selectedTypes, setSelectedTypes] = useState<string[]>(["readme"]);
   const [generatedContent, setGeneratedContent] = useState<Record<string, string>>({});
