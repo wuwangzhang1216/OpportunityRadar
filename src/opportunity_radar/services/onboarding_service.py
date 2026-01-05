@@ -184,12 +184,16 @@ def normalize_goals(goals: list[str]) -> list[str]:
 class OnboardingService:
     """Service for onboarding flow with URL extraction."""
 
+    MAX_REDIRECTS = 5  # Limit redirect hops to prevent loops
+
     def __init__(self):
         settings = get_settings()
         self.openai_client = OpenAI(api_key=settings.openai_api_key)
+        # SECURITY: Disable automatic redirects to prevent SSRF bypass
+        # Redirects are handled manually with SSRF validation on each hop
         self.http_client = httpx.AsyncClient(
             timeout=30.0,
-            follow_redirects=True,
+            follow_redirects=False,  # Manual redirect handling for SSRF safety
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             },
@@ -198,6 +202,53 @@ class OnboardingService:
     async def close(self):
         """Close HTTP client."""
         await self.http_client.aclose()
+
+    async def _safe_get(self, url: str) -> httpx.Response:
+        """
+        Perform a GET request with SSRF-safe redirect handling.
+
+        Each redirect hop is validated against SSRF protection rules.
+
+        Args:
+            url: The URL to fetch
+
+        Returns:
+            The final response after following redirects
+
+        Raises:
+            SSRFProtectionError: If any URL in the redirect chain fails validation
+            httpx.TooManyRedirects: If redirect limit is exceeded
+        """
+        current_url = url
+        for _ in range(self.MAX_REDIRECTS):
+            # Validate current URL for SSRF before making request
+            validate_url_for_ssrf(current_url)
+
+            response = await self.http_client.get(current_url)
+
+            # Check if this is a redirect
+            if response.status_code in (301, 302, 303, 307, 308):
+                location = response.headers.get("location")
+                if not location:
+                    return response  # No location header, return as-is
+
+                # Handle relative redirects
+                if location.startswith("/"):
+                    parsed = urlparse(current_url)
+                    current_url = f"{parsed.scheme}://{parsed.netloc}{location}"
+                else:
+                    current_url = location
+
+                # Validate redirect target (will raise SSRFProtectionError if blocked)
+                # This prevents redirect-based SSRF bypasses
+                continue
+
+            return response
+
+        raise httpx.TooManyRedirects(
+            f"Exceeded maximum redirects ({self.MAX_REDIRECTS})",
+            request=httpx.Request("GET", url),
+        )
 
     def detect_url_type(self, url: str) -> URLType:
         """Detect if URL is a website or GitHub repo."""
@@ -295,7 +346,7 @@ class OnboardingService:
     async def _fetch_page_text(self, url: str) -> Optional[str]:
         """Fetch and extract text from a single page."""
         try:
-            response = await self.http_client.get(url)
+            response = await self._safe_get(url)
             if response.status_code != 200:
                 return None
 
