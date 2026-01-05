@@ -22,6 +22,7 @@ async def create_demo_account():
     from src.opportunity_radar.core.security import get_password_hash
     from src.opportunity_radar.models.user import User
     from src.opportunity_radar.models.profile import Profile
+    from src.opportunity_radar.services.embedding_service import get_embedding_service
 
     # Initialize database
     print("Connecting to database...")
@@ -78,10 +79,11 @@ async def create_demo_account():
         "preferred_team_size_min": 2,
         "preferred_team_size_max": 5,
         "goals": [
-            "win_hackathons",
-            "get_funding",
-            "build_network",
-            "learn_skills"
+            "prizes",      # Maps to hackathon, competition
+            "funding",     # Maps to grant, accelerator
+            "networking",  # Maps to hackathon, accelerator
+            "learning",    # Maps to hackathon, competition
+            "building",    # Maps to hackathon, buildathon
         ],
         "interests": [
             "AI/ML",
@@ -126,11 +128,33 @@ async def create_demo_account():
             if key != "user_id":
                 setattr(existing_profile, key, value)
         existing_profile.updated_at = datetime.now(timezone.utc)
-        await existing_profile.save()
-        print("Profile updated!")
+        profile = existing_profile
     else:
         print("Creating new profile...")
         profile = Profile(**profile_data)
+
+    # Generate embedding for the profile
+    print("Generating profile embedding...")
+    try:
+        embedding_service = get_embedding_service()
+        embedding_text = embedding_service.create_profile_embedding_text(
+            tech_stack=profile_data["tech_stack"],
+            industries=profile_data["interests"],
+            intents=profile_data["goals"],
+            profile_type="startup",
+            stage=profile_data.get("company_stage"),
+        )
+        embedding = embedding_service.get_embedding(embedding_text)
+        profile.embedding = embedding
+        print(f"Embedding generated! Length: {len(embedding)}")
+    except Exception as e:
+        print(f"Warning: Failed to generate embedding: {e}")
+
+    # Save profile
+    if existing_profile:
+        await profile.save()
+        print("Profile updated!")
+    else:
         await profile.insert()
         print("Profile created!")
 
@@ -140,6 +164,7 @@ async def create_demo_account():
     print(f"Email:    {DEMO_EMAIL}")
     print(f"Password: {DEMO_PASSWORD}")
     print(f"Name:     {DEMO_FULL_NAME}")
+    print(f"Embedding: {'Yes' if profile.embedding else 'No'}")
     print("=" * 50)
 
     return user

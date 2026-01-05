@@ -23,6 +23,83 @@ from .embedding_service import get_embedding_service
 
 logger = logging.getLogger(__name__)
 
+# Valid goals that map to opportunity types
+VALID_GOALS = {"funding", "prizes", "learning", "networking", "exposure", "mentorship", "equity", "building"}
+
+# Mapping for normalizing free-text goals to standard values
+GOALS_NORMALIZATION_MAP = {
+    # funding related
+    "get_funding": "funding",
+    "raise_money": "funding",
+    "investment": "funding",
+    "fundraising": "funding",
+    "capital": "funding",
+    "grant": "funding",
+    "grants": "funding",
+    # prizes related
+    "win": "prizes",
+    "win_hackathons": "prizes",
+    "win_prizes": "prizes",
+    "awards": "prizes",
+    "competition": "prizes",
+    "hackathon": "prizes",
+    # learning related
+    "learn": "learning",
+    "learn_skills": "learning",
+    "education": "learning",
+    "skills": "learning",
+    "grow": "learning",
+    # networking related
+    "network": "networking",
+    "build_network": "networking",
+    "connections": "networking",
+    "community": "networking",
+    "meet_people": "networking",
+    # exposure related
+    "visibility": "exposure",
+    "marketing": "exposure",
+    "brand": "exposure",
+    "users": "exposure",
+    "get_users": "exposure",
+    "grow_users": "exposure",
+    "customers": "exposure",
+    # mentorship related
+    "mentor": "mentorship",
+    "guidance": "mentorship",
+    "advice": "mentorship",
+    # building related
+    "build": "building",
+    "create": "building",
+    "ship": "building",
+    "launch": "building",
+    "product": "building",
+}
+
+
+def normalize_goals(goals: list[str]) -> list[str]:
+    """Normalize free-text goals to standard values."""
+    if not goals:
+        return []
+
+    normalized = set()
+    for goal in goals:
+        goal_lower = goal.lower().strip().replace(" ", "_")
+
+        # Check if already a valid goal
+        if goal_lower in VALID_GOALS:
+            normalized.add(goal_lower)
+        # Check if it maps to a valid goal
+        elif goal_lower in GOALS_NORMALIZATION_MAP:
+            normalized.add(GOALS_NORMALIZATION_MAP[goal_lower])
+        # Try partial matching
+        else:
+            for key, value in GOALS_NORMALIZATION_MAP.items():
+                if key in goal_lower or goal_lower in key:
+                    normalized.add(value)
+                    break
+
+    return list(normalized)
+
 
 class OnboardingService:
     """Service for onboarding flow with URL extraction."""
@@ -312,7 +389,7 @@ Extract the following fields if present:
 - team_size: Approximate team size if mentioned
 - profile_type: One of: developer, startup, student, researcher, freelancer
 - location: Country or region if mentioned
-- goals: What they're trying to achieve (funding, users, etc.)
+- goals: What they're trying to achieve. MUST be a list containing ONLY these values: funding, prizes, learning, networking, exposure, mentorship, equity, building. Map their goals to these categories.
 
 For each field, provide:
 - value: The extracted value (string, list, or number)
@@ -378,6 +455,9 @@ If a field cannot be determined, omit it from the response."""
         Returns:
             Created Profile document
         """
+        # Normalize goals to standard values
+        normalized_goals = normalize_goals(data.goals) if data.goals else []
+
         # Check if profile already exists
         existing = await Profile.find_one(Profile.user_id == user.id)
         if existing:
@@ -386,7 +466,7 @@ If a field cannot be determined, omit it from the response."""
             existing.bio = data.bio
             existing.tech_stack = data.tech_stack
             existing.interests = data.interests
-            existing.goals = data.goals
+            existing.goals = normalized_goals
             existing.experience_level = data.experience_level
             existing.preferred_team_size_min = 1
             existing.preferred_team_size_max = data.team_size
@@ -408,7 +488,7 @@ If a field cannot be determined, omit it from the response."""
             bio=data.bio,
             tech_stack=data.tech_stack,
             interests=data.interests,
-            goals=data.goals,
+            goals=normalized_goals,
             experience_level=data.experience_level,
             preferred_team_size_min=1,
             preferred_team_size_max=data.team_size,
