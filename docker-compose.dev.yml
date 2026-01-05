@@ -1,7 +1,24 @@
-# Development override - only starts database services
+# Development override - starts database services for local development
 # Use: docker-compose -f docker-compose.dev.yml up -d
 
 services:
+  # MongoDB for document storage (primary database)
+  mongodb:
+    image: mongo:7
+    container_name: opportunity_radar_mongodb
+    environment:
+      MONGO_INITDB_DATABASE: opportunity_radar
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL with pgvector (for vector search if needed)
   db:
     image: pgvector/pgvector:pg16
     container_name: opportunity_radar_db
@@ -13,13 +30,14 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./scripts/db/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Redis for caching and task queue
   redis:
     image: redis:7-alpine
     container_name: opportunity_radar_redis
@@ -33,6 +51,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # Database Admin UI (optional)
   adminer:
     image: adminer
     container_name: opportunity_radar_adminer
@@ -42,5 +61,6 @@ services:
       - db
 
 volumes:
+  mongodb_data:
   postgres_data:
   redis_data:

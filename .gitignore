@@ -52,7 +52,7 @@ coverage.xml
 
 # Environments
 # Note: .env is tracked in this private repo
-.env
+# .env
 # .env.local
 # .env.*.local
 .venv
