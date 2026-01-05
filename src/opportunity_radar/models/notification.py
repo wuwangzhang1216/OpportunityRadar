@@ -67,12 +67,12 @@ class Notification(Document):
     metadata: dict = Field(default_factory=dict)
 
     # Status
-    is_read: Indexed(bool) = False
+    is_read: bool = False
     is_sent: bool = False  # For email notifications
     sent_at: Optional[datetime] = None
     read_at: Optional[datetime] = None
 
-    created_at: Indexed(datetime) = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: Optional[datetime] = None  # Auto-delete after expiration
 
     class Settings:

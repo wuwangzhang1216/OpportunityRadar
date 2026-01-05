@@ -23,12 +23,13 @@ if "%MODE%"=="logs" goto logs
 goto usage
 
 :dev
-echo Starting development services (DB + Redis only)...
+echo Starting development services (MongoDB + PostgreSQL + Redis)...
 docker-compose -f docker-compose.dev.yml up -d
 echo.
 echo Services started:
+echo   - MongoDB: localhost:27017
 echo   - PostgreSQL: localhost:5432
-echo   - Redis: localhost:6379
+echo   - Redis: localhost:6380
 echo   - Adminer: http://localhost:8080
 echo.
 echo Now run the backend and frontend locally:

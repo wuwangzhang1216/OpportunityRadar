@@ -166,7 +166,7 @@ async def generate_materials(
             material_type=target,
             content=result.content,
             metadata=result.metadata,
-            model_used="gpt-4o-mini",
+            model_used="gpt-5-mini",
         )
         await material.insert()
 
@@ -322,7 +322,7 @@ async def test_generate_materials_invalid_target():
 
 | Risk | Mitigation |
 |------|------------|
-| OpenAI costs | Use gpt-4o-mini (cheaper model) |
+| OpenAI costs | Use gpt-5-mini (cheaper model) |
 | Slow generation | Set 60s timeout, show loading UI |
 | Token limits | Truncate long inputs, handle gracefully |
 

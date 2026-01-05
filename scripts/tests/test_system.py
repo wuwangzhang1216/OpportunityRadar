@@ -36,7 +36,7 @@ def test_imports():
 
     # Models
     try:
-        from src.opportunity_radar.models import User, Profile, Opportunity, Batch, Match, Pipeline, Material
+        from src.opportunity_radar.models import User, Profile, Opportunity, Host, Match, Pipeline, Material, ScraperRun
         tests.append(("Models", True, None))
     except Exception as e:
         tests.append(("Models", False, str(e)))
@@ -45,7 +45,7 @@ def test_imports():
     try:
         from src.opportunity_radar.services import (
             AuthService, OpportunityService, EmbeddingService,
-            MatchingService, ProfileService, MaterialService, PipelineService
+            MatchingService, ProfileService, PipelineService
         )
         tests.append(("Services", True, None))
     except Exception as e:
