@@ -77,7 +77,7 @@ Demo账号已预填以下信息（基于 https://doxmind.com/）：
 | 公司阶段 | MVP |
 | 产品阶段 | Beta |
 | 融资状态 | Bootstrapped, 寻求 $100K-$500K |
-| 目标 | win_hackathons, get_funding, build_network, learn_skills |
+| 目标 | prizes, funding, networking, learning, building |
 | 兴趣领域 | AI/ML, Developer Tools, Productivity, Documentation, SaaS |
 
 ---
