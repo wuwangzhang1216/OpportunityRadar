@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -19,12 +19,14 @@ import {
   Wand2,
   Zap,
   Bot,
+  User,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/services/api-client";
+import { useToast } from "@/components/ui/toast";
 
 const materialTypes = [
   {
@@ -93,11 +95,13 @@ export default function GeneratorPage() {
   const searchParams = useSearchParams();
   // Support both batch_id and opportunity_id for backwards compatibility
   const opportunityId = searchParams.get("batch_id") || searchParams.get("opportunity_id");
+  const { success } = useToast();
 
   const [selectedTypes, setSelectedTypes] = useState<string[]>(["readme"]);
   const [generatedContent, setGeneratedContent] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   const { data: opportunity } = useQuery({
     queryKey: ["opportunity", opportunityId],
@@ -105,9 +109,17 @@ export default function GeneratorPage() {
     enabled: !!opportunityId,
   });
 
+  // Fetch user profile for auto-fill
+  const { data: profile } = useQuery({
+    queryKey: ["profile"],
+    queryFn: () => apiClient.getProfile(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -118,6 +130,22 @@ export default function GeneratorPage() {
       techStack: "",
     },
   });
+
+  // Auto-fill from profile data
+  useEffect(() => {
+    if (profile && !profileLoaded) {
+      if (profile.product_name) {
+        setValue("projectName", profile.product_name);
+      }
+      if (profile.description) {
+        setValue("problem", profile.description);
+      }
+      if (profile.tech_stack && profile.tech_stack.length > 0) {
+        setValue("techStack", profile.tech_stack.join(", "));
+      }
+      setProfileLoaded(true);
+    }
+  }, [profile, profileLoaded, setValue]);
 
   const generateMutation = useMutation({
     mutationFn: (data: FormData) =>
@@ -156,6 +184,8 @@ export default function GeneratorPage() {
   const copyToClipboard = async (id: string, content: string) => {
     await navigator.clipboard.writeText(content);
     setCopiedId(id);
+    const type = materialTypes.find((t) => t.id === id);
+    success("Copied to clipboard", `${type?.label || "Content"} has been copied`);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -193,18 +223,31 @@ export default function GeneratorPage() {
             </p>
           </div>
         </div>
-        {opportunity && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mt-4"
-          >
-            <Badge className="bg-sky-100 text-primary border-sky-200">
-              <Zap className="h-3 w-3 mr-1" />
-              For: {opportunity.title}
-            </Badge>
-          </motion.div>
-        )}
+        <div className="flex flex-wrap gap-2 mt-4">
+          {opportunity && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <Badge className="bg-sky-100 text-primary border-sky-200">
+                <Zap className="h-3 w-3 mr-1" />
+                For: {opportunity.title}
+              </Badge>
+            </motion.div>
+          )}
+          {profileLoaded && profile && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              <Badge variant="ai" className="gap-1">
+                <User className="h-3 w-3" />
+                Pre-filled from profile
+              </Badge>
+            </motion.div>
+          )}
+        </div>
       </motion.div>
 
       {/* Material Type Selection */}

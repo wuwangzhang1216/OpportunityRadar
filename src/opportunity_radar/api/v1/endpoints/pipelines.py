@@ -5,10 +5,12 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from beanie import PydanticObjectId
+from beanie.operators import In
 
 from ....core.security import get_current_user
 from ....models.user import User
 from ....models.pipeline import Pipeline
+from ....models.opportunity import Opportunity
 
 router = APIRouter()
 
@@ -23,7 +25,7 @@ async def list_pipelines(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Get user's pipeline items.
+    Get user's pipeline items with enriched opportunity data.
 
     Stages: discovered, preparing, submitted, pending, won, lost
     """
@@ -31,8 +33,35 @@ async def list_pipelines(
     if stage:
         query["status"] = stage
 
-    items = await Pipeline.find(query).skip(skip).limit(limit).to_list()
+    pipelines = await Pipeline.find(query).skip(skip).limit(limit).to_list()
     total = await Pipeline.find(query).count()
+
+    if not pipelines:
+        return {
+            "items": [],
+            "total": total,
+            "limit": limit,
+            "offset": skip,
+        }
+
+    # Fetch related opportunities in bulk for enrichment
+    opp_ids = [p.opportunity_id for p in pipelines if p.opportunity_id]
+    opps = await Opportunity.find(In(Opportunity.id, opp_ids)).to_list()
+    opp_by_id = {o.id: o for o in opps}
+
+    # Enrich pipeline items with opportunity data
+    items = []
+    for p in pipelines:
+        pipeline_data = p.model_dump(mode="json")
+        opp = opp_by_id.get(p.opportunity_id)
+        if opp:
+            pipeline_data["opportunity_title"] = opp.title
+            pipeline_data["opportunity_category"] = opp.opportunity_type
+            pipeline_data["opportunity_description"] = opp.description
+            pipeline_data["deadline"] = opp.application_deadline.isoformat() if opp.application_deadline else None
+            pipeline_data["opportunity_url"] = opp.website_url
+            pipeline_data["opportunity_prize_pool"] = opp.total_prize_value
+        items.append(pipeline_data)
 
     return {
         "items": items,
@@ -88,7 +117,8 @@ async def create_pipeline(
     current_user: User = Depends(get_current_user),
 ):
     """Add opportunity to pipeline."""
-    opportunity_id = pipeline_data.get("opportunity_id")
+    # Support both opportunity_id and batch_id for frontend compatibility
+    opportunity_id = pipeline_data.get("opportunity_id") or pipeline_data.get("batch_id")
     if not opportunity_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

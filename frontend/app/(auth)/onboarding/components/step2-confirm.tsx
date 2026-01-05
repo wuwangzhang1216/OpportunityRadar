@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Building2,
   FileText,
@@ -15,12 +16,16 @@ import {
   Check,
   X,
   Pencil,
+  ChevronDown,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useOnboardingStore } from "@/stores/onboarding-store";
+import { ProfileQualityScore } from "@/components/onboarding/profile-quality-score";
+import { AIInsightBanner } from "@/components/onboarding/ai-insight-banner";
 
 interface FieldCardProps {
   icon: React.ReactNode;
@@ -135,14 +140,17 @@ function TagInput({ tags, onChange, suggestions = [], placeholder }: TagInputPro
 
   const addSuggestion = (suggestion: string) => {
     if (!tags.includes(suggestion)) {
-      onChange([...tags, suggestion]);
+      const newTags = [...tags, suggestion];
+      console.log("addSuggestion:", { suggestion, tags, newTags });
+      onChange(newTags);
     }
   };
 
+  // Filter suggestions based on input, or show all if no input
   const filteredSuggestions = suggestions
     .filter((s) => !tags.includes(s))
-    .filter((s) => s.toLowerCase().includes(input.toLowerCase()))
-    .slice(0, 5);
+    .filter((s) => !input || s.toLowerCase().includes(input.toLowerCase()))
+    .slice(0, input ? 5 : 8); // Show more suggestions when no input
 
   return (
     <div className="space-y-2">
@@ -164,19 +172,97 @@ function TagInput({ tags, onChange, suggestions = [], placeholder }: TagInputPro
           className="flex-1 min-w-[100px] outline-none text-sm"
         />
       </div>
-      {filteredSuggestions.length > 0 && input && (
-        <div className="flex flex-wrap gap-1">
-          {filteredSuggestions.map((s) => (
-            <button
-              key={s}
-              onClick={() => addSuggestion(s)}
-              className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-            >
-              + {s}
-            </button>
-          ))}
-        </div>
+      {filteredSuggestions.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-lg border border-primary/20 bg-primary/5 p-3"
+        >
+          <div className="flex items-center gap-1.5 mb-2">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-primary">AI Suggestions</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {filteredSuggestions.map((s) => (
+              <button
+                key={s}
+                onClick={() => addSuggestion(s)}
+                className="text-xs px-2.5 py-1.5 bg-white hover:bg-primary hover:text-white border border-primary/30 rounded-full transition-colors flex items-center gap-1 group"
+              >
+                <span className="text-primary group-hover:text-white transition-colors">+</span>
+                {s}
+              </button>
+            ))}
+          </div>
+        </motion.div>
       )}
+    </div>
+  );
+}
+
+// Accordion Section Component
+interface AccordionSectionProps {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  fieldCount?: number;
+  filledCount?: number;
+}
+
+function AccordionSection({
+  title,
+  description,
+  icon,
+  isOpen,
+  onToggle,
+  children,
+  fieldCount,
+  filledCount,
+}: AccordionSectionProps) {
+  return (
+    <div className="border border-border rounded-xl overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 bg-secondary/30 hover:bg-secondary/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="text-primary">{icon}</div>
+          <div className="text-left">
+            <h3 className="font-medium text-sm">{title}</h3>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {fieldCount !== undefined && filledCount !== undefined && (
+            <Badge variant={filledCount === fieldCount ? "success" : "secondary"} size="sm">
+              {filledCount}/{fieldCount}
+            </Badge>
+          )}
+          <motion.div
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronDown className="h-5 w-5 text-muted-foreground" />
+          </motion.div>
+        </div>
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="p-4 space-y-3 border-t border-border">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -195,14 +281,31 @@ export function Step2Confirm() {
 
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<any>(null);
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["basic"]));
+
+  const toggleSection = (section: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) {
+        next.delete(section);
+      } else {
+        next.add(section);
+      }
+      return next;
+    });
+  };
 
   const startEdit = (field: string, currentValue: any) => {
+    console.log("startEdit:", { field, currentValue, suggestions });
     setEditingField(field);
     setTempValue(currentValue);
   };
 
   const saveEdit = (field: string) => {
-    updateField(field as any, tempValue);
+    console.log("saveEdit called:", { field, tempValue });
+    if (tempValue !== null && tempValue !== undefined) {
+      updateField(field as any, tempValue);
+    }
     setEditingField(null);
     setTempValue(null);
   };
@@ -222,155 +325,229 @@ export function Step2Confirm() {
     return extracted?.confidence;
   };
 
+  // Calculate section completion
+  const basicFilled = [
+    confirmedData.display_name,
+    confirmedData.bio && confirmedData.bio.length > 10,
+  ].filter(Boolean).length;
+
+  const techFilled = [
+    confirmedData.tech_stack?.length > 0,
+    confirmedData.industries?.length > 0,
+  ].filter(Boolean).length;
+
+  const goalsFilled = [
+    confirmedData.goals?.length > 0,
+    confirmedData.team_size,
+    confirmedData.location_country,
+  ].filter(Boolean).length;
+
+  // Prepare profile data for quality score
+  const profileForScore = {
+    product_name: confirmedData.display_name,
+    description: confirmedData.bio,
+    tech_stack: confirmedData.tech_stack,
+    industries: confirmedData.industries,
+    goals: confirmedData.goals,
+    team_size: confirmedData.team_size?.toString(),
+    location: confirmedData.location_country,
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* AI Insight Banner */}
+      {(confirmedData.tech_stack?.length > 0 || confirmedData.industries?.length > 0) && (
+        <AIInsightBanner
+          profile={profileForScore}
+          urlType={extractedProfile?.source_url?.includes("github") ? "github" : "website"}
+        />
+      )}
+
+      {/* Profile Quality Score */}
+      <ProfileQualityScore profile={profileForScore} />
+
       {extractedProfile && (
-        <div className="text-sm text-gray-500 mb-4 text-center">
-          We extracted this information from{" "}
-          <span className="font-medium">{extractedProfile.source_url}</span>.
-          Click to edit any field.
+        <div className="text-sm text-muted-foreground text-center flex items-center justify-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span>
+            AI extracted from{" "}
+            <span className="font-medium text-foreground">{extractedProfile.source_url}</span>
+          </span>
         </div>
       )}
 
       <div className="space-y-3">
-        {/* Company/Project Name */}
-        <FieldCard
+        {/* Basic Information - Always expanded by default */}
+        <AccordionSection
+          title="Basic Information"
+          description="Your project or company identity"
           icon={<Building2 className="h-5 w-5" />}
-          label="Name"
-          value={confirmedData.display_name}
-          confidence={getConfidence("company_name")}
-          onEdit={() => startEdit("display_name", confirmedData.display_name)}
-          isEditing={editingField === "display_name"}
-          editComponent={
-            <Input
-              value={tempValue || ""}
-              onChange={(e) => setTempValue(e.target.value)}
-              placeholder="Your company or project name"
-            />
-          }
-          onSave={() => saveEdit("display_name")}
-          onCancel={cancelEdit}
-        />
+          isOpen={openSections.has("basic")}
+          onToggle={() => toggleSection("basic")}
+          fieldCount={2}
+          filledCount={basicFilled}
+        >
+          {/* Company/Project Name */}
+          <FieldCard
+            icon={<Building2 className="h-5 w-5" />}
+            label="Name"
+            value={confirmedData.display_name}
+            confidence={getConfidence("company_name")}
+            onEdit={() => startEdit("display_name", confirmedData.display_name)}
+            isEditing={editingField === "display_name"}
+            editComponent={
+              <Input
+                value={tempValue || ""}
+                onChange={(e) => setTempValue(e.target.value)}
+                placeholder="Your company or project name"
+              />
+            }
+            onSave={() => saveEdit("display_name")}
+            onCancel={cancelEdit}
+          />
 
-        {/* Bio/Description */}
-        <FieldCard
-          icon={<FileText className="h-5 w-5" />}
-          label="Description"
-          value={confirmedData.bio}
-          confidence={getConfidence("product_description")}
-          onEdit={() => startEdit("bio", confirmedData.bio)}
-          isEditing={editingField === "bio"}
-          editComponent={
-            <textarea
-              value={tempValue || ""}
-              onChange={(e) => setTempValue(e.target.value)}
-              placeholder="Brief description of what you do"
-              className="w-full p-2 border rounded-lg text-sm min-h-[80px]"
-            />
-          }
-          onSave={() => saveEdit("bio")}
-          onCancel={cancelEdit}
-        />
+          {/* Bio/Description */}
+          <FieldCard
+            icon={<FileText className="h-5 w-5" />}
+            label="Description"
+            value={confirmedData.bio}
+            confidence={getConfidence("product_description")}
+            onEdit={() => startEdit("bio", confirmedData.bio)}
+            isEditing={editingField === "bio"}
+            editComponent={
+              <textarea
+                value={tempValue || ""}
+                onChange={(e) => setTempValue(e.target.value)}
+                placeholder="Brief description of what you do"
+                className="w-full p-2 border rounded-lg text-sm min-h-[80px]"
+              />
+            }
+            onSave={() => saveEdit("bio")}
+            onCancel={cancelEdit}
+          />
+        </AccordionSection>
 
-        {/* Tech Stack */}
-        <FieldCard
+        {/* Tech DNA */}
+        <AccordionSection
+          title="Tech DNA"
+          description="Technologies and industries you work with"
           icon={<Code2 className="h-5 w-5" />}
-          label="Tech Stack"
-          value={confirmedData.tech_stack}
-          confidence={getConfidence("tech_stack")}
-          onEdit={() => startEdit("tech_stack", confirmedData.tech_stack)}
-          isEditing={editingField === "tech_stack"}
-          editComponent={
-            <TagInput
-              tags={tempValue || []}
-              onChange={setTempValue}
-              suggestions={suggestions?.tech_stacks}
-              placeholder="Add technologies..."
-            />
-          }
-          onSave={() => saveEdit("tech_stack")}
-          onCancel={cancelEdit}
-        />
+          isOpen={openSections.has("tech")}
+          onToggle={() => toggleSection("tech")}
+          fieldCount={2}
+          filledCount={techFilled}
+        >
+          {/* Tech Stack */}
+          <FieldCard
+            icon={<Code2 className="h-5 w-5" />}
+            label="Tech Stack"
+            value={confirmedData.tech_stack}
+            confidence={getConfidence("tech_stack")}
+            onEdit={() => startEdit("tech_stack", confirmedData.tech_stack)}
+            isEditing={editingField === "tech_stack"}
+            editComponent={
+              <TagInput
+                tags={tempValue || []}
+                onChange={setTempValue}
+                suggestions={suggestions?.tech_stacks}
+                placeholder="Add technologies..."
+              />
+            }
+            onSave={() => saveEdit("tech_stack")}
+            onCancel={cancelEdit}
+          />
 
-        {/* Industries */}
-        <FieldCard
-          icon={<Briefcase className="h-5 w-5" />}
-          label="Industries"
-          value={confirmedData.industries}
-          confidence={getConfidence("industries")}
-          onEdit={() => startEdit("industries", confirmedData.industries)}
-          isEditing={editingField === "industries"}
-          editComponent={
-            <TagInput
-              tags={tempValue || []}
-              onChange={setTempValue}
-              suggestions={suggestions?.industries}
-              placeholder="Add industries..."
-            />
-          }
-          onSave={() => saveEdit("industries")}
-          onCancel={cancelEdit}
-        />
+          {/* Industries */}
+          <FieldCard
+            icon={<Briefcase className="h-5 w-5" />}
+            label="Industries"
+            value={confirmedData.industries}
+            confidence={getConfidence("industries")}
+            onEdit={() => startEdit("industries", confirmedData.industries)}
+            isEditing={editingField === "industries"}
+            editComponent={
+              <TagInput
+                tags={tempValue || []}
+                onChange={setTempValue}
+                suggestions={suggestions?.industries}
+                placeholder="Add industries..."
+              />
+            }
+            onSave={() => saveEdit("industries")}
+            onCancel={cancelEdit}
+          />
+        </AccordionSection>
 
-        {/* Goals */}
-        <FieldCard
+        {/* Goals & Context */}
+        <AccordionSection
+          title="Goals & Context"
+          description="What you're looking to achieve"
           icon={<Target className="h-5 w-5" />}
-          label="Goals"
-          value={confirmedData.goals}
-          confidence={getConfidence("goals")}
-          onEdit={() => startEdit("goals", confirmedData.goals)}
-          isEditing={editingField === "goals"}
-          editComponent={
-            <TagInput
-              tags={tempValue || []}
-              onChange={setTempValue}
-              suggestions={suggestions?.goals}
-              placeholder="What are you looking to achieve?"
-            />
-          }
-          onSave={() => saveEdit("goals")}
-          onCancel={cancelEdit}
-        />
+          isOpen={openSections.has("goals")}
+          onToggle={() => toggleSection("goals")}
+          fieldCount={3}
+          filledCount={goalsFilled}
+        >
+          {/* Goals */}
+          <FieldCard
+            icon={<Target className="h-5 w-5" />}
+            label="Goals"
+            value={confirmedData.goals}
+            confidence={getConfidence("goals")}
+            onEdit={() => startEdit("goals", confirmedData.goals)}
+            isEditing={editingField === "goals"}
+            editComponent={
+              <TagInput
+                tags={tempValue || []}
+                onChange={setTempValue}
+                suggestions={suggestions?.goals}
+                placeholder="What are you looking to achieve?"
+              />
+            }
+            onSave={() => saveEdit("goals")}
+            onCancel={cancelEdit}
+          />
 
-        {/* Team Size */}
-        <FieldCard
-          icon={<Users className="h-5 w-5" />}
-          label="Team Size"
-          value={confirmedData.team_size}
-          confidence={getConfidence("team_size")}
-          onEdit={() => startEdit("team_size", confirmedData.team_size)}
-          isEditing={editingField === "team_size"}
-          editComponent={
-            <Input
-              type="number"
-              min={1}
-              max={100}
-              value={tempValue || 1}
-              onChange={(e) => setTempValue(parseInt(e.target.value) || 1)}
-            />
-          }
-          onSave={() => saveEdit("team_size")}
-          onCancel={cancelEdit}
-        />
+          {/* Team Size */}
+          <FieldCard
+            icon={<Users className="h-5 w-5" />}
+            label="Team Size"
+            value={confirmedData.team_size}
+            confidence={getConfidence("team_size")}
+            onEdit={() => startEdit("team_size", confirmedData.team_size)}
+            isEditing={editingField === "team_size"}
+            editComponent={
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={tempValue || 1}
+                onChange={(e) => setTempValue(parseInt(e.target.value) || 1)}
+              />
+            }
+            onSave={() => saveEdit("team_size")}
+            onCancel={cancelEdit}
+          />
 
-        {/* Location */}
-        <FieldCard
-          icon={<MapPin className="h-5 w-5" />}
-          label="Location"
-          value={confirmedData.location_country}
-          confidence={getConfidence("location")}
-          onEdit={() => startEdit("location_country", confirmedData.location_country)}
-          isEditing={editingField === "location_country"}
-          editComponent={
-            <Input
-              value={tempValue || ""}
-              onChange={(e) => setTempValue(e.target.value)}
-              placeholder="Country or region"
-            />
-          }
-          onSave={() => saveEdit("location_country")}
-          onCancel={cancelEdit}
-        />
+          {/* Location */}
+          <FieldCard
+            icon={<MapPin className="h-5 w-5" />}
+            label="Location"
+            value={confirmedData.location_country}
+            confidence={getConfidence("location")}
+            onEdit={() => startEdit("location_country", confirmedData.location_country)}
+            isEditing={editingField === "location_country"}
+            editComponent={
+              <Input
+                value={tempValue || ""}
+                onChange={(e) => setTempValue(e.target.value)}
+                placeholder="Country or region"
+              />
+            }
+            onSave={() => saveEdit("location_country")}
+            onCancel={cancelEdit}
+          />
+        </AccordionSection>
       </div>
 
       {confirmError && (

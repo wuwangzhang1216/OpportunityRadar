@@ -105,9 +105,14 @@ class EmbeddingService:
         intents: List[str],
         profile_type: Optional[str] = None,
         stage: Optional[str] = None,
+        bio: Optional[str] = None,
+        display_name: Optional[str] = None,
     ) -> str:
         """
-        Create a text representation of a profile for embedding.
+        Create a rich text representation of a profile for embedding.
+
+        The text is structured to maximize semantic similarity with relevant opportunities.
+        Bio/description is the most important signal as it contains the actual project context.
 
         Args:
             tech_stack: List of technologies
@@ -115,28 +120,78 @@ class EmbeddingService:
             intents: List of goals (funding, learning, etc.)
             profile_type: Type of profile (student, startup, etc.)
             stage: Startup stage if applicable
+            bio: Project/company description - PRIMARY signal
+            display_name: Project/company name
 
         Returns:
             Combined text for embedding
         """
         parts = []
 
+        # Bio is the most important - put it first for embedding models
+        if bio:
+            parts.append(bio[:1500])
+
+        if display_name:
+            parts.append(f"Project: {display_name}")
+
         if profile_type:
-            parts.append(f"Profile type: {profile_type}")
+            parts.append(f"Type: {profile_type}")
 
         if stage:
             parts.append(f"Stage: {stage}")
 
         if tech_stack:
-            parts.append(f"Technologies: {', '.join(tech_stack)}")
+            # Expand common abbreviations for better semantic matching
+            expanded_tech = self._expand_tech_terms(tech_stack)
+            parts.append(f"Built with: {', '.join(expanded_tech)}")
 
         if industries:
-            parts.append(f"Industries: {', '.join(industries)}")
+            parts.append(f"Domain: {', '.join(industries)}")
 
         if intents:
-            parts.append(f"Goals: {', '.join(intents)}")
+            # Map goals to more descriptive phrases
+            goal_phrases = self._expand_goals(intents)
+            parts.append(f"Looking for: {', '.join(goal_phrases)}")
 
-        return ". ".join(parts) if parts else "General developer profile"
+        return " ".join(parts) if parts else "General developer profile"
+
+    def _expand_tech_terms(self, tech_stack: List[str]) -> List[str]:
+        """Expand tech abbreviations for better embedding matching."""
+        expansions = {
+            "js": "JavaScript",
+            "ts": "TypeScript",
+            "py": "Python",
+            "ml": "Machine Learning",
+            "ai": "Artificial Intelligence",
+            "llm": "Large Language Model",
+            "db": "Database",
+            "api": "API backend",
+            "ui": "User Interface",
+            "ux": "User Experience",
+        }
+        result = []
+        for tech in tech_stack:
+            lower = tech.lower()
+            if lower in expansions:
+                result.append(expansions[lower])
+            else:
+                result.append(tech)
+        return result
+
+    def _expand_goals(self, goals: List[str]) -> List[str]:
+        """Expand goals to more descriptive phrases for embedding."""
+        expansions = {
+            "funding": "funding and investment opportunities",
+            "prizes": "competitions with cash prizes",
+            "learning": "learning new skills and technologies",
+            "networking": "networking and meeting collaborators",
+            "exposure": "visibility and user acquisition",
+            "mentorship": "mentorship and guidance from experts",
+            "building": "building and shipping products at hackathons",
+            "equity": "equity-based accelerator programs",
+        }
+        return [expansions.get(g.lower(), g) for g in goals]
 
     def create_opportunity_embedding_text(
         self,

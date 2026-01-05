@@ -27,6 +27,8 @@ import type { Match } from "@/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NoMatchesEmptyState, NoOpportunitiesEmptyState } from "@/components/ui/empty-state";
+import { ScoreTooltip } from "@/components/ui/tooltip";
+import { useToast } from "@/components/ui/toast";
 
 const categories = [
   { value: "", label: "All" },
@@ -220,6 +222,7 @@ export default function OpportunitiesPage() {
 function MatchCard({ match }: { match: Match }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { warning, success } = useToast();
   const matchId = match.id || match._id;
   const batchId = match.batch_id;
 
@@ -251,6 +254,18 @@ function MatchCard({ match }: { match: Match }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["matches"] });
       queryClient.invalidateQueries({ queryKey: ["topMatches"] });
+      if (!match.is_bookmarked) {
+        success("Bookmarked", "Opportunity saved to your bookmarks");
+      }
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => apiClient.restoreMatch(matchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["topMatches"] });
+      success("Restored", "Opportunity has been restored to your matches");
     },
   });
 
@@ -264,6 +279,20 @@ function MatchCard({ match }: { match: Match }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["matches"] });
       queryClient.invalidateQueries({ queryKey: ["topMatches"] });
+
+      // Show toast with undo option only when dismissing
+      if (!match.is_dismissed) {
+        warning(
+          "Opportunity dismissed",
+          `"${match.opportunity_title?.slice(0, 30)}..." has been dismissed`,
+          {
+            label: "Undo",
+            onClick: () => {
+              restoreMutation.mutate();
+            },
+          }
+        );
+      }
     },
   });
 
@@ -344,13 +373,19 @@ function MatchCard({ match }: { match: Match }) {
           >
             {category}
           </Badge>
-          {/* Match Score */}
-          <div
-            className={`flex items-center gap-1 px-2 py-1 rounded-full text-white text-sm font-medium ${getScoreColor(scorePercent)}`}
+          {/* Match Score with Tooltip */}
+          <ScoreTooltip
+            score={scorePercent}
+            breakdown={match.score_breakdown}
+            reasons={match.reasons}
           >
-            <Star className="h-3 w-3 fill-current" />
-            {scorePercent}%
-          </div>
+            <div
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-white text-sm font-medium cursor-help ${getScoreColor(scorePercent)}`}
+            >
+              <Star className="h-3 w-3 fill-current" />
+              {scorePercent}%
+            </div>
+          </ScoreTooltip>
         </div>
 
         <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-foreground group-hover:text-primary transition-colors">

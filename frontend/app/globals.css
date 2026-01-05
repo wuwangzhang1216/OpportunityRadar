@@ -29,6 +29,17 @@
     /* Glass Effect */
     --glass-bg: 0 0% 100% / 0.9;
     --glass-border: 0 0% 0% / 0.05;
+
+    /* Urgency Colors - for deadline visualization */
+    --urgency-safe: 142 71% 45%;
+    --urgency-warning: 45 93% 47%;
+    --urgency-urgent: 27 96% 61%;
+    --urgency-critical: 0 84% 60%;
+    --urgency-expired: 0 0% 60%;
+
+    /* AI Accent Colors */
+    --ai-gradient-start: 203 89% 53%;
+    --ai-gradient-end: 271 81% 56%;
   }
 
   .dark {
@@ -56,6 +67,17 @@
     /* Glass Effect - Dark */
     --glass-bg: 0 0% 7% / 0.9;
     --glass-border: 0 0% 100% / 0.1;
+
+    /* Urgency Colors - Dark Mode (same hues, adjusted for dark) */
+    --urgency-safe: 142 71% 45%;
+    --urgency-warning: 45 93% 47%;
+    --urgency-urgent: 27 96% 61%;
+    --urgency-critical: 0 84% 60%;
+    --urgency-expired: 0 0% 50%;
+
+    /* AI Accent Colors - Dark */
+    --ai-gradient-start: 203 89% 53%;
+    --ai-gradient-end: 271 81% 56%;
   }
 }
 
@@ -263,3 +285,116 @@
 .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
 .stagger-children > *:nth-child(7) { animation-delay: 300ms; }
 .stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+
+/* Urgency Pulse Animation - for critical deadlines (< 3 days) */
+@keyframes urgency-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--urgency-critical) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--urgency-critical) / 0);
+  }
+}
+
+.animate-urgency-pulse {
+  animation: urgency-pulse 2s ease-in-out infinite;
+}
+
+/* Urgency Glow Animation - for urgent deadlines (3-7 days) */
+@keyframes urgency-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--urgency-urgent) / 0.2);
+    border-left-color: hsl(var(--urgency-urgent));
+  }
+  50% {
+    box-shadow: 0 0 12px 0 hsl(var(--urgency-urgent) / 0.3);
+    border-left-color: hsl(var(--urgency-urgent) / 0.8);
+  }
+}
+
+.animate-urgency-glow {
+  animation: urgency-glow 3s ease-in-out infinite;
+}
+
+/* Urgency Subtle Animation - for warning deadlines (7-14 days) */
+@keyframes urgency-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.animate-urgency-subtle {
+  animation: urgency-subtle 4s ease-in-out infinite;
+}
+
+/* Success Flash Animation */
+@keyframes success-flash {
+  0% { background-color: transparent; }
+  50% { background-color: hsl(var(--urgency-safe) / 0.1); }
+  100% { background-color: transparent; }
+}
+
+.animate-success-flash {
+  animation: success-flash 0.6s ease-out;
+}
+
+/* AI Gradient Background */
+.ai-gradient {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--ai-gradient-start)) 0%,
+    hsl(var(--ai-gradient-end)) 100%
+  );
+}
+
+.ai-gradient-text {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--ai-gradient-start)) 0%,
+    hsl(var(--ai-gradient-end)) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* AI Shimmer Effect */
+@keyframes ai-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.ai-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--ai-gradient-start) / 0.1) 0%,
+    hsl(var(--ai-gradient-end) / 0.2) 50%,
+    hsl(var(--ai-gradient-start) / 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: ai-shimmer 2s ease-in-out infinite;
+}
+
+/* Safe Area for Mobile Devices */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Touch-friendly tap targets */
+@media (pointer: coarse) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

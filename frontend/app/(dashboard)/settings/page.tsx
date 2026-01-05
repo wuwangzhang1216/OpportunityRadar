@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiClient } from "@/services/api-client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useAuthStore } from "@/stores/auth-store";
+import { useTourStore } from "@/stores/tour-store";
+import { RotateCcw, Sparkles, Kanban, LayoutDashboard, Check } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
@@ -172,6 +175,15 @@ export default function SettingsPage() {
         <CalendarSubscriptionSection />
       </Card>
 
+      {/* Guided Tours */}
+      <Card className="p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Guided Tours</h2>
+        <p className="text-gray-600 mb-4">
+          Replay product tours to learn about features. Click a tour to reset and replay it.
+        </p>
+        <GuidedToursSection />
+      </Card>
+
       {/* Danger Zone */}
       <Card className="p-6 border-red-200">
         <h2 className="text-lg font-semibold text-red-600 mb-4">Danger Zone</h2>
@@ -251,6 +263,113 @@ function CalendarSubscriptionSection() {
           {loading ? "Loading..." : "Get Subscription URL"}
         </Button>
       )}
+    </div>
+  );
+}
+
+function GuidedToursSection() {
+  const router = useRouter();
+  const {
+    hasCompletedDashboardTour,
+    hasCompletedGeneratorTour,
+    hasCompletedPipelineTour,
+    markTourComplete,
+    resetTours,
+  } = useTourStore();
+
+  const tours = [
+    {
+      id: "dashboard" as const,
+      label: "Dashboard Tour",
+      description: "Learn about your personalized dashboard",
+      icon: LayoutDashboard,
+      completed: hasCompletedDashboardTour,
+      path: "/dashboard",
+    },
+    {
+      id: "generator" as const,
+      label: "AI Generator Tour",
+      description: "Discover how to generate materials with AI",
+      icon: Sparkles,
+      completed: hasCompletedGeneratorTour,
+      path: "/generator",
+    },
+    {
+      id: "pipeline" as const,
+      label: "Pipeline Tour",
+      description: "Master your opportunity pipeline",
+      icon: Kanban,
+      completed: hasCompletedPipelineTour,
+      path: "/pipeline",
+    },
+  ];
+
+  const handleResetAndNavigate = (tourId: "dashboard" | "generator" | "pipeline", path: string) => {
+    // Reset the specific tour by setting it to false, then navigate
+    // We need to manually reset just this tour
+    const store = useTourStore.getState();
+    if (tourId === "dashboard") {
+      useTourStore.setState({ hasCompletedDashboardTour: false });
+    } else if (tourId === "generator") {
+      useTourStore.setState({ hasCompletedGeneratorTour: false });
+    } else if (tourId === "pipeline") {
+      useTourStore.setState({ hasCompletedPipelineTour: false });
+    }
+    router.push(path);
+  };
+
+  const handleResetAll = () => {
+    resetTours();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-3">
+        {tours.map((tour) => (
+          <div
+            key={tour.id}
+            className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${tour.completed ? "bg-green-100" : "bg-primary/10"}`}>
+                <tour.icon className={`h-4 w-4 ${tour.completed ? "text-green-600" : "text-primary"}`} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-sm">{tour.label}</p>
+                  {tour.completed && (
+                    <span className="flex items-center gap-1 text-xs text-green-600">
+                      <Check className="h-3 w-3" />
+                      Completed
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">{tour.description}</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleResetAndNavigate(tour.id, tour.path)}
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              {tour.completed ? "Replay" : "Start"}
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      <div className="pt-2 border-t">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleResetAll}
+          className="w-full justify-center text-muted-foreground hover:text-foreground"
+        >
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Reset All Tours
+        </Button>
+      </div>
     </div>
   );
 }

@@ -69,7 +69,7 @@ async def list_matches(
         match_data["opportunity_category"] = opp.opportunity_type if opp else None
         match_data["opportunity_description"] = opp.description if opp else None
         match_data["deadline"] = opp.application_deadline.isoformat() if opp and opp.application_deadline else None
-        match_data["opportunity_url"] = opp.url if opp else None
+        match_data["opportunity_url"] = opp.website_url if opp else None
         match_data["opportunity_prize_pool"] = opp.total_prize_value if opp else None
         items.append(match_data)
 
@@ -117,7 +117,7 @@ async def get_top_matches(
         match_data["opportunity_title"] = opp.title if opp else None
         match_data["opportunity_category"] = opp.opportunity_type if opp else None
         match_data["deadline"] = opp.application_deadline.isoformat() if opp and opp.application_deadline else None
-        match_data["opportunity_url"] = opp.url if opp else None
+        match_data["opportunity_url"] = opp.website_url if opp else None
         items.append(match_data)
 
     return {"items": items, "count": len(items)}

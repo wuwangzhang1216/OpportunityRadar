@@ -6,9 +6,9 @@
 
 ## 概述
 
-- **预计时长**: 7-8分钟 (使用预设账号，跳过注册)
+- **预计时长**: 约11分钟 (包含注册和完整Onboarding 3步流程)
 - **目标受众**: 潜在用户、投资人、合作伙伴
-- **核心卖点**: AI驱动的机会匹配 + 智能材料生成
+- **核心卖点**: AI驱动的机会匹配 + 智能材料生成 + 智能Onboarding
 
 ---
 
@@ -19,7 +19,6 @@
 - [ ] 前端服务运行正常 (`npm run dev`)
 - [ ] 数据库中有足够的机会数据
 - [ ] 清除浏览器缓存，使用无痕模式
-- [ ] **运行Demo账号创建脚本** (见下方)
 
 ### 录制工具
 - [ ] 屏幕录制软件 (OBS / Loom / 系统自带)
@@ -30,157 +29,166 @@
 
 ## Demo 账号信息
 
-### 创建Demo账号
-
-在录制前运行以下命令创建/更新Demo账号：
-
-```bash
-python scripts/demo/create_demo_account.py
-```
-
-### 测试所有Demo API
-
-运行测试脚本验证所有演示中会用到的API：
-
-```bash
-python scripts/demo/test_demo_apis.py
-```
-
-测试覆盖的功能：
-- 认证登录
-- Dashboard统计和Top匹配
-- 机会列表和详情
-- 匹配收藏/驳回
-- Pipeline创建和阶段更新
-- AI材料生成
-- Profile获取
-- 通知系统
-
-### 登录凭证
+### 录制时使用的注册信息
 
 | 字段 | 值 |
 |------|-----|
+| **Full Name** | `DoxMind Team` |
 | **Email** | `demo@doxmind.com` |
 | **Password** | `DemoRadar2024!` |
-| **Name** | DoxMind Team |
 
-### 预设Profile信息
-
-Demo账号已预填以下信息（基于 https://doxmind.com/）：
+### Onboarding时使用的URL
 
 | 字段 | 值 |
 |------|-----|
-| 团队名称 | DoxMind |
-| 产品描述 | AI-powered documentation assistant |
-| 技术栈 | Python, TypeScript, Next.js, FastAPI, LLM, RAG, Vector Database |
-| 团队规模 | 3人 |
-| 公司阶段 | MVP |
-| 产品阶段 | Beta |
-| 融资状态 | Bootstrapped, 寻求 $100K-$500K |
-| 目标 | prizes, funding, networking, learning, building |
-| 兴趣领域 | AI/ML, Developer Tools, Productivity, Documentation, SaaS |
+| **网站URL** | `https://doxmind.com` |
+
+> AI会自动从URL提取以下信息，可在Step 2中确认/编辑
 
 ---
 
 ## Demo 脚本
 
-### 第一幕：开场与登录 (30秒)
+### 第一幕：开场与注册 (1分钟)
 
 | 时间 | 页面 | 操作 | 旁白要点 |
 |------|------|------|----------|
 | 0:00 | `/` | 展示首页 | "欢迎使用OpportunityRadar，一个AI驱动的机会发现平台" |
 | 0:15 | `/` | 滚动查看功能介绍 | "帮助开发者和创业团队发现最匹配的Hackathon、Grant、Bounty等机会" |
-| 0:25 | `/login` | 点击登录 | "让我们登录一个已有账号来查看完整功能" |
-| 0:30 | `/login` | 输入Demo账号登录 | 输入: `demo@doxmind.com` / `DemoRadar2024!` |
+| 0:25 | `/` | 点击"Get Started"按钮 | "让我们注册一个新账号体验完整流程" |
+| 0:35 | `/signup` | 填写Full Name | 输入: `DoxMind Team` |
+| 0:40 | `/signup` | 填写Email | 输入: `demo@doxmind.com` |
+| 0:45 | `/signup` | 填写Password和Confirm | 输入密码 |
+| 0:55 | `/signup` | 点击"Create account" | "注册成功后，系统会引导我们完成初始设置" |
 
-> **使用预设Demo账号，跳过注册流程，节省时间**
-
----
-
-### 第二幕：Dashboard概览 (1分钟)
-
-| 时间 | 页面 | 操作 | 旁白要点 |
-|------|------|------|----------|
-| 0:40 | `/dashboard` | 展示整体界面 | "这是你的个人仪表板" |
-| 0:50 | `/dashboard` | 指向统计卡片 | "顶部显示匹配总数、进行中的机会、已赢得的机会" |
-| 1:05 | `/dashboard` | 指向Top Matches | "这里是匹配度最高的机会，绿色表示高匹配度" |
-| 1:20 | `/dashboard` | 指向Pipeline Overview | "Pipeline显示你的机会追踪进度" |
-| 1:30 | `/dashboard` | 点击Quick Action | "快速操作可以直接跳转到各个功能" |
+> **无需邮箱验证，注册后自动跳转到Onboarding**
 
 ---
 
-### 第三幕：发现与筛选机会 (2分钟)
+### 第二幕：Onboarding引导 (2分30秒) ⭐新用户体验
+
+**Onboarding 3步流程**: Enter URL → Confirm Profile → Get Matches
+
+#### Step 1: URL智能提取
 
 | 时间 | 页面 | 操作 | 旁白要点 |
 |------|------|------|----------|
-| 1:40 | `/opportunities` | 展示机会列表 | "Opportunities页面显示所有为你匹配的机会" |
-| 1:55 | `/opportunities` | 使用类型过滤器 | "可以按类型筛选：Hackathon、Grant、Bounty、加速器等" |
-| 2:10 | `/opportunities` | 选择Hackathon | "比如只看Hackathon类型的机会" |
-| 2:25 | `/opportunities` | 悬停在卡片上 | "悬停可以快速收藏、忽略或添加到Pipeline" |
-| 2:40 | `/opportunities` | 点击一个高匹配度的机会 | "让我们看看这个89%匹配度的机会" |
-| 2:50 | `/opportunities/[id]` | 展示详情页顶部 | "详情页显示完整的机会信息" |
-| 3:05 | 详情页 | **重点展示匹配分析卡片** | "这是AI的四维度匹配分析" |
-| 3:15 | 详情页 | 逐个解释四个维度 | "相关性、资格审查、时间表、团队适配" |
-| 3:30 | 详情页 | 展示改进建议 | "AI还会给出如何提高匹配度的建议" |
-| 3:40 | 详情页 | 点击"Add to Pipeline" | "把这个机会加入我们的追踪Pipeline" |
+| 1:00 | `/onboarding` | 展示Step 1界面 | "系统会引导新用户完成个人资料设置，只需3步" |
+| 1:10 | `/onboarding` | 指向进度条 | "第一步：输入你的网站或GitHub地址" |
+| 1:20 | `/onboarding` | 输入URL | 输入: `https://doxmind.com` |
+| 1:30 | `/onboarding` | 点击Continue | "AI会自动提取项目信息" |
+| 1:35 | `/onboarding` | 展示提取动画 | "正在分析网站内容..." |
+
+#### Step 2: 确认Profile信息
+
+| 时间 | 页面 | 操作 | 旁白要点 |
+|------|------|------|----------|
+| 1:50 | `/onboarding` | 展示Step 2界面 | "AI自动识别了项目信息" |
+| 2:00 | `/onboarding` | 指向各字段 | "团队名称、产品描述、技术栈都自动填充了" |
+| 2:10 | `/onboarding` | 指向Confidence标签 | "绿色表示高置信度，可以点击编辑调整" |
+| 2:20 | `/onboarding` | **演示编辑Goals** | "可以添加你的目标：funding, prizes等" |
+| 2:35 | `/onboarding` | 点击Continue | "确认信息后继续" |
+
+#### Step 3: 查看匹配结果
+
+| 时间 | 页面 | 操作 | 旁白要点 |
+|------|------|------|----------|
+| 2:45 | `/onboarding` | 展示加载动画 | "AI正在为你匹配机会..." |
+| 2:55 | `/onboarding` | 展示Step 3界面 | "Profile创建成功！" |
+| 3:05 | `/onboarding` | 展示Top 3匹配 | "这是匹配度最高的3个机会" |
+| 3:15 | `/onboarding` | 指向匹配分数和原因 | "每个机会显示匹配度和匹配原因" |
+| 3:25 | `/onboarding` | 点击"Go to Dashboard" | "进入Dashboard开始探索" |
 
 ---
 
-### 第四幕：Pipeline管理 (1分钟)
+### 第三幕：Dashboard概览 (1分钟)
 
 | 时间 | 页面 | 操作 | 旁白要点 |
 |------|------|------|----------|
-| 3:50 | `/pipeline` | 展示Kanban看板 | "Pipeline是一个Kanban风格的看板" |
-| 4:00 | `/pipeline` | 介绍6个阶段 | "从发现、准备、提交、待审、到最终的赢得或失败" |
-| 4:15 | `/pipeline` | **拖拽卡片演示** | "拖拽卡片就可以更新状态" |
-| 4:25 | `/pipeline` | 将卡片从Discovered拖到Preparing | "比如开始准备这个机会" |
-| 4:35 | `/pipeline` | 右键点击卡片 | "右键可以快速生成材料或标记状态" |
+| 3:30 | `/dashboard` | 展示整体界面 | "这是你的个人仪表板" |
+| 3:40 | `/dashboard` | 指向统计卡片 | "顶部显示匹配总数、进行中的机会、已赢得的机会" |
+| 3:55 | `/dashboard` | 指向Top Matches | "这里是匹配度最高的机会，绿色表示高匹配度" |
+| 4:10 | `/dashboard` | 指向Pipeline Overview | "Pipeline显示你的机会追踪进度" |
+| 4:20 | `/dashboard` | 点击导航进入Opportunities | "让我们看看所有匹配的机会" |
 
 ---
 
-### 第五幕：AI材料生成 (2分钟) ⭐核心功能
+### 第四幕：发现与筛选机会 (2分30秒)
 
 | 时间 | 页面 | 操作 | 旁白要点 |
 |------|------|------|----------|
-| 4:50 | `/generator` | 进入AI Generator | "现在来看最强大的功能：AI材料生成器" |
-| 5:00 | `/generator` | 展示材料类型选项 | "支持生成README、演讲稿、Demo脚本、Q&A准备" |
-| 5:15 | `/generator` | 选择"3分钟演讲稿" | "让我们为DoxMind生成一个3分钟的演讲稿" |
-| 5:25 | `/generator` | 填写项目信息 | "输入项目名称和核心信息" |
-| 5:35 | `/generator` | 项目名: DoxMind | - |
-| 5:40 | `/generator` | 问题: 开发者花费大量时间阅读和理解文档 | - |
-| 5:50 | `/generator` | 解决方案: AI驱动的文档问答和摘要工具 | - |
-| 6:00 | `/generator` | 技术栈: Next.js, Python, LLM, RAG | - |
-| 6:10 | `/generator` | **点击生成按钮** | "点击生成，AI开始工作" |
-| 6:15 | `/generator` | 展示生成动画 | "几秒钟后..." |
-| 6:30 | `/generator` | **展示生成结果** | "一份专业的3分钟演讲稿就生成好了" |
-| 6:45 | `/generator` | 滚动查看内容 | "包含开场白、问题陈述、解决方案、技术亮点、结尾" |
-| 7:00 | `/generator` | 点击复制按钮 | "一键复制到剪贴板，直接使用" |
+| 4:30 | `/opportunities` | 展示机会列表 | "Opportunities页面显示所有为你匹配的机会" |
+| 4:40 | `/opportunities` | **使用搜索框** | "可以通过关键词搜索感兴趣的机会" |
+| 4:50 | `/opportunities` | 输入搜索词如"AI" | "比如搜索AI相关的机会" |
+| 5:00 | `/opportunities` | 清除搜索，使用类型过滤器 | "也可以按类型筛选：Hackathon、Grant、Bounty等" |
+| 5:15 | `/opportunities` | 选择Hackathon | "比如只看Hackathon类型的机会" |
+| 5:25 | `/opportunities` | 悬停在卡片上 | "悬停可以快速操作" |
+| 5:35 | `/opportunities` | **点击收藏按钮** | "点击星标收藏感兴趣的机会" |
+| 5:45 | `/opportunities` | 展示收藏成功反馈 | "收藏的机会可以稍后在Saved中查看" |
+| 5:55 | `/opportunities` | 点击一个高匹配度的机会 | "让我们看看这个高匹配度的机会详情" |
+| 6:05 | `/opportunities/[id]` | 展示详情页顶部 | "详情页显示完整的机会信息" |
+| 6:20 | 详情页 | **重点展示匹配分析卡片** | "这是AI的四维度匹配分析" |
+| 6:30 | 详情页 | 逐个解释四个维度 | "相关性、资格审查、时间表、团队适配" |
+| 6:45 | 详情页 | 展示改进建议 | "AI还会给出如何提高匹配度的建议" |
+| 6:55 | 详情页 | 点击"Add to Pipeline" | "把这个机会加入我们的追踪Pipeline" |
 
 ---
 
-### 第六幕：收尾 (30秒)
+### 第五幕：Pipeline管理 (1分钟)
 
 | 时间 | 页面 | 操作 | 旁白要点 |
 |------|------|------|----------|
-| 7:10 | `/materials` | 展示材料库 | "所有生成的材料都保存在材料库中" |
-| 7:20 | `/profile` | 快速展示Profile | "随时可以更新个人资料以获得更精准的匹配" |
-| 7:30 | `/dashboard` | 回到Dashboard | "这就是OpportunityRadar" |
-| 7:40 | - | 结束画面 | "让AI帮你发现机会，赢得比赛" |
+| 7:05 | `/pipeline` | 展示Kanban看板 | "Pipeline是一个Kanban风格的看板" |
+| 7:15 | `/pipeline` | 介绍6个阶段 | "从发现、准备、提交、待审、到最终的赢得或失败" |
+| 7:30 | `/pipeline` | **拖拽卡片演示** | "拖拽卡片就可以更新状态" |
+| 7:40 | `/pipeline` | 将卡片从Discovered拖到Preparing | "比如开始准备这个机会" |
+| 7:50 | `/pipeline` | 右键点击卡片 | "右键可以快速生成材料或标记状态" |
+
+---
+
+### 第六幕：AI材料生成 (2分钟) ⭐核心功能
+
+| 时间 | 页面 | 操作 | 旁白要点 |
+|------|------|------|----------|
+| 8:00 | `/generator` | 进入AI Generator | "现在来看最强大的功能：AI材料生成器" |
+| 8:10 | `/generator` | 展示材料类型选项 | "支持生成README、演讲稿、Demo脚本、Q&A准备" |
+| 8:25 | `/generator` | 选择"3分钟演讲稿" | "让我们为DoxMind生成一个3分钟的演讲稿" |
+| 8:35 | `/generator` | 填写项目信息 | "输入项目名称和核心信息" |
+| 8:45 | `/generator` | 项目名: DoxMind | - |
+| 8:50 | `/generator` | 问题: 开发者花费大量时间阅读和理解文档 | - |
+| 9:00 | `/generator` | 解决方案: AI驱动的文档问答和摘要工具 | - |
+| 9:10 | `/generator` | 技术栈: Next.js, Python, LLM, RAG | - |
+| 9:20 | `/generator` | **点击生成按钮** | "点击生成，AI开始工作" |
+| 9:25 | `/generator` | 展示生成动画 | "几秒钟后..." |
+| 9:40 | `/generator` | **展示生成结果** | "一份专业的3分钟演讲稿就生成好了" |
+| 9:55 | `/generator` | 滚动查看内容 | "包含开场白、问题陈述、解决方案、技术亮点、结尾" |
+| 10:10 | `/generator` | 点击复制按钮 | "一键复制到剪贴板，直接使用" |
+
+---
+
+### 第七幕：收尾 (30秒)
+
+| 时间 | 页面 | 操作 | 旁白要点 |
+|------|------|------|----------|
+| 10:20 | `/materials` | 展示材料库 | "所有生成的材料都保存在材料库中" |
+| 10:30 | `/profile` | 快速展示Profile | "随时可以更新个人资料以获得更精准的匹配" |
+| 10:40 | `/dashboard` | 回到Dashboard | "这就是OpportunityRadar" |
+| 10:50 | - | 结束画面 | "让AI帮你发现机会，赢得比赛" |
 
 ---
 
 ## 关键演示点 Checklist
 
 ### 必须展示的功能
+- [x] **URL智能提取** - Onboarding自动提取项目信息
 - [x] **Dashboard统计概览** - 展示匹配数、进度
+- [x] **搜索功能** - 关键词搜索机会
+- [x] **收藏操作** - 快速收藏感兴趣的机会
 - [x] **四维度匹配分析** - 机会详情页
 - [x] **拖拽Pipeline** - Kanban看板
 - [x] **AI材料生成** - 生成演讲稿
 
 ### 可选展示的功能（如有额外时间）
-- [ ] URL智能提取 (Onboarding) - 可单独录制
-- [ ] OAuth登录 (GitHub/Google)
-- [ ] 搜索功能
 - [ ] 日历集成
 - [ ] 社区提交
 

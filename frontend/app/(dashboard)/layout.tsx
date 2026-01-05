@@ -26,6 +26,8 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/services/api-client";
+import { MobileNav } from "@/components/navigation/mobile-nav";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 interface NavItem {
   href: string;
@@ -421,7 +423,8 @@ export default function DashboardLayout({
           "min-h-screen transition-all duration-300",
           "lg:ml-[280px]",
           isCollapsed && "lg:ml-20",
-          "pt-16 lg:pt-0"
+          "pt-16 lg:pt-0",
+          "pb-20 md:pb-0" // Add padding for mobile nav
         )}
       >
         <div className="p-4 lg:p-8">
@@ -430,10 +433,15 @@ export default function DashboardLayout({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
           >
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </motion.div>
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileNav />
     </div>
   );
 }

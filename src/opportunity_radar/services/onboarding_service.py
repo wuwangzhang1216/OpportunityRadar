@@ -515,64 +515,77 @@ class OnboardingService:
     async def _llm_extract(
         self, content: str, url_type: URLType
     ) -> dict[str, Optional[ExtractedField]]:
-        """Use LLM to extract structured profile data from content."""
+        """Use LLM to extract structured profile data from content using Structured Outputs."""
+        from pydantic import BaseModel, Field as PydanticField
+        from typing import Literal
 
         if not content or len(content) < 50:
             return {}
 
+        # Define Pydantic models for Structured Outputs
+        class ExtractedFieldModel(BaseModel):
+            value: str | list[str] | int
+            confidence: float = PydanticField(ge=0.0, le=1.0, description="Confidence score 0-1")
+            source: str = PydanticField(description="Where this was extracted from")
+
+        class ProfileExtraction(BaseModel):
+            company_name: ExtractedFieldModel = PydanticField(description="Company or project name")
+            product_description: ExtractedFieldModel = PydanticField(description="What the product/project does (1-2 sentences)")
+            tech_stack: ExtractedFieldModel = PydanticField(description="Technologies, frameworks, languages used as a list")
+            industries: ExtractedFieldModel = PydanticField(description="Industries or domains. MUST infer from product description if not explicit. Examples: AI/ML, Developer Tools, SaaS, FinTech, HealthTech, EdTech, Productivity")
+            profile_type: ExtractedFieldModel = PydanticField(description="One of: developer, startup, student, researcher, freelancer")
+            location: ExtractedFieldModel = PydanticField(description="Country or region. Use 'Global' or 'Remote' if not mentioned")
+            goals: ExtractedFieldModel = PydanticField(description="MUST infer goals from context. Value must be a list with items from: funding, prizes, learning, networking, exposure, mentorship, equity, building")
+            team_size: ExtractedFieldModel = PydanticField(description="Team size estimate. Use 1 for solo projects, 5 for small startups if not mentioned")
+
         system_prompt = """You are an AI assistant that extracts structured profile information from website or GitHub content.
 
-Extract the following fields if present:
-- company_name: The company or project name
-- product_description: What the product/project does (1-2 sentences)
-- tech_stack: Technologies, frameworks, languages used (as a list)
-- industries: Industries or domains (e.g., FinTech, HealthTech, AI/ML)
-- team_size: Approximate team size if mentioned
-- profile_type: One of: developer, startup, student, researcher, freelancer
-- location: Country or region if mentioned
-- goals: What they're trying to achieve. MUST be a list containing ONLY these values: funding, prizes, learning, networking, exposure, mentorship, equity, building. Map their goals to these categories.
+IMPORTANT RULES:
+1. You MUST provide ALL fields - never skip any field
+2. For fields not explicitly mentioned, you MUST INFER them from context:
+   - industries: Infer from product description (e.g., "AI editor" → ["AI/ML", "Developer Tools", "Productivity"])
+   - goals: Infer from product stage (e.g., early product → ["building", "exposure"], funding page → ["funding"])
+   - location: Use "Global" or "Remote" if not mentioned
+   - team_size: Use 1 for solo projects, estimate 5 for startups if unknown
+   - profile_type: Infer from context (product = "startup", library = "developer", research = "researcher")
 
-For each field, provide:
-- value: The extracted value (string, list, or number)
-- confidence: How confident you are (0.0 to 1.0)
-- source: Brief note about where you found this
+3. For inferred fields, use lower confidence (0.3-0.5) and source like "inferred from product description"
+4. For goals, map to these categories: funding, prizes, learning, networking, exposure, mentorship, equity, building
 
-Respond ONLY with valid JSON in this format:
-{
-  "company_name": {"value": "...", "confidence": 0.9, "source": "from page title"},
-  "tech_stack": {"value": ["Python", "React"], "confidence": 0.8, "source": "from about page"},
-  ...
-}
+Be proactive in inferring reasonable values rather than leaving fields empty."""
 
-If a field cannot be determined, omit it from the response."""
-
-        user_prompt = f"""Extract profile information from this {url_type.value} content:
+        user_prompt = f"""Extract profile information from this {url_type.value} content. Remember to fill ALL fields, inferring when necessary:
 
 {content[:4000]}"""
 
         try:
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+            response = self.openai_client.beta.chat.completions.parse(
+                model="gpt-5-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.3,
-                max_tokens=1000,
-                response_format={"type": "json_object"},
+                max_completion_tokens=16000,
+                response_format=ProfileExtraction,
             )
 
-            result_text = response.choices[0].message.content
-            result_data = json.loads(result_text)
+            parsed = response.choices[0].message.parsed
+
+            if parsed is None:
+                # Check for refusal
+                if response.choices[0].message.refusal:
+                    logger.warning(f"LLM refused extraction: {response.choices[0].message.refusal}")
+                return {}
 
             # Convert to ExtractedField objects
             extracted = {}
-            for field_name, field_data in result_data.items():
-                if isinstance(field_data, dict) and "value" in field_data:
+            for field_name in ["company_name", "product_description", "tech_stack", "industries", "profile_type", "location", "goals", "team_size"]:
+                field_data = getattr(parsed, field_name, None)
+                if field_data:
                     extracted[field_name] = ExtractedField(
-                        value=field_data["value"],
-                        confidence=field_data.get("confidence", 0.5),
-                        source=field_data.get("source", "LLM extraction"),
+                        value=field_data.value,
+                        confidence=field_data.confidence,
+                        source=field_data.source,
                     )
 
             return extracted
@@ -606,7 +619,8 @@ If a field cannot be determined, omit it from the response."""
             existing.display_name = data.display_name
             existing.bio = data.bio
             existing.tech_stack = data.tech_stack
-            existing.interests = data.interests
+            # Use industries as interests for matching (interests is used in scoring)
+            existing.interests = data.industries or data.interests or []
             existing.industries = data.industries or []
             existing.goals = normalized_goals
             existing.experience_level = data.experience_level
@@ -629,7 +643,8 @@ If a field cannot be determined, omit it from the response."""
             display_name=data.display_name,
             bio=data.bio,
             tech_stack=data.tech_stack,
-            interests=data.interests,
+            # Use industries as interests for matching (interests is used in scoring)
+            interests=data.industries or data.interests or [],
             industries=data.industries or [],
             goals=normalized_goals,
             experience_level=data.experience_level,
@@ -650,7 +665,11 @@ If a field cannot be determined, omit it from the response."""
     def _generate_profile_embedding(
         self, data: OnboardingConfirmRequest
     ) -> Optional[list[float]]:
-        """Generate embedding for profile."""
+        """Generate embedding for profile.
+
+        Includes bio/description which is the most important semantic signal
+        for matching against opportunity descriptions.
+        """
         try:
             embedding_service = get_embedding_service()
             embedding_text = embedding_service.create_profile_embedding_text(
@@ -658,6 +677,8 @@ If a field cannot be determined, omit it from the response."""
                 industries=data.industries,
                 intents=data.goals,
                 profile_type=data.profile_type,
+                bio=data.bio,  # Critical for semantic matching
+                display_name=data.display_name,
             )
             return embedding_service.get_embedding(embedding_text)
         except Exception as e:
