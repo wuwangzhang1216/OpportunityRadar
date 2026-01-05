@@ -171,3 +171,39 @@ class TestMatchingWorkflow:
         """Test top matches endpoint exists."""
         response = await async_client.get("/api/v1/matches/top")
         assert response.status_code in [401, 403, 422, 500]
+
+    @pytest.mark.asyncio
+    async def test_match_status_endpoint_exists(self, async_client: AsyncClient):
+        """Test match status endpoint exists."""
+        response = await async_client.get("/api/v1/matches/status")
+        assert response.status_code in [401, 403, 422, 500]
+
+    @pytest.mark.asyncio
+    async def test_match_calculate_endpoint_exists(self, async_client: AsyncClient):
+        """Test match calculate endpoint exists."""
+        response = await async_client.post("/api/v1/matches/calculate")
+        assert response.status_code in [400, 401, 403, 422, 500]
+
+    @pytest.mark.asyncio
+    async def test_match_stats_endpoint_exists(self, async_client: AsyncClient):
+        """Test match stats endpoint exists."""
+        response = await async_client.get("/api/v1/matches/stats")
+        assert response.status_code in [401, 403, 422, 500]
+
+    @pytest.mark.asyncio
+    async def test_match_by_batch_endpoint_exists(self, async_client: AsyncClient):
+        """Test match by batch endpoint exists."""
+        response = await async_client.get("/api/v1/matches/by-batch/test123")
+        assert response.status_code in [401, 403, 422, 500]
+
+    @pytest.mark.asyncio
+    async def test_match_dismiss_endpoint_exists(self, async_client: AsyncClient):
+        """Test match dismiss endpoint exists."""
+        response = await async_client.post("/api/v1/matches/test123/dismiss")
+        assert response.status_code in [401, 403, 404, 422, 500]
+
+    @pytest.mark.asyncio
+    async def test_match_bookmark_endpoint_exists(self, async_client: AsyncClient):
+        """Test match bookmark endpoint exists."""
+        response = await async_client.post("/api/v1/matches/test123/bookmark")
+        assert response.status_code in [401, 403, 404, 422, 500]

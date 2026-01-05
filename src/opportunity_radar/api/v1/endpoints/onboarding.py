@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from ....core.security import get_current_user
 from ....models.user import User
@@ -21,6 +21,18 @@ from ....services.onboarding_service import get_onboarding_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def compute_matches_background(user_id: str, profile_id: str):
+    """Background task to compute matches after profile confirmation."""
+    try:
+        from ....services.mongo_matching_service import MongoMatchingService
+        service = MongoMatchingService()
+        matches = await service.compute_matches_for_profile(profile_id, limit=100, min_score=0.0)
+        await service.save_matches(user_id, matches)
+        logger.info(f"Computed {len(matches)} matches for user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to compute matches for user {user_id}: {e}")
 
 
 @router.post("/extract", response_model=URLExtractResponse)
@@ -58,18 +70,26 @@ async def extract_profile_from_url(
 @router.post("/confirm", response_model=OnboardingConfirmResponse)
 async def confirm_profile(
     request: OnboardingConfirmRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
 ):
     """
     Confirm extracted profile data and create/update user profile.
 
     This finalizes the onboarding process and creates the user's profile
-    with the confirmed data.
+    with the confirmed data. Match calculation is triggered in the background.
     """
     service = get_onboarding_service()
 
     try:
         profile = await service.confirm_profile(current_user, request)
+
+        # Trigger background match computation
+        background_tasks.add_task(
+            compute_matches_background,
+            str(current_user.id),
+            str(profile.id)
+        )
 
         return OnboardingConfirmResponse(
             success=True,

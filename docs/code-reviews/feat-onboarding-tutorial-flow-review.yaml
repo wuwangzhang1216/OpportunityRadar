@@ -1,0 +1,261 @@
+---
+title: "P2 Code Review Issues from feat/onboarding-tutorial-flow Branch"
+date: 2026-01-06
+category: code-review
+tags:
+  - code-review
+  - security
+  - data-integrity
+  - api-design
+  - mongodb
+components:
+  - onboarding
+  - matches
+  - profiles
+severity: P2
+status: resolved
+
+summary: |
+  Comprehensive code review using Codex identified and resolved 5 critical P2 (Important)
+  issues in the onboarding tutorial flow feature branch. Issues spanned API contract
+  mismatches, database field naming inconsistencies, SSRF vulnerabilities, data loss
+  problems, and stale data accumulation.
+
+issues:
+  - id: "001"
+    title: "batch_id field missing from Match model"
+    severity: P2
+    status: resolved
+    description: |
+      The frontend expected a `batch_id` field in match responses to identify
+      opportunities, but the Match model did not have this field. The endpoint
+      queried for a non-existent `Match.batch_id` field.
+
+    affected_files:
+      - src/opportunity_radar/api/v1/endpoints/matches.py
+
+    root_cause: |
+      Frontend assumes batch_id represents the opportunity identifier, but there
+      was no mapping between this frontend contract and the backend Match model.
+      The field is conceptually the opportunity_id in the Match document.
+
+    fix_applied: |
+      Added computed `batch_id` field in match response serialization that maps
+      to the opportunity_id. Both list_matches() and get_top_matches() endpoints
+      now include: `match_data["batch_id"] = str(m.opportunity_id) if m.opportunity_id else None`
+
+    lines_changed: "65-66, 115-115"
+    complexity: low
+    risk: low
+    test_coverage: existing tests cover match endpoints
+
+  - id: "002"
+    title: "API parameter contract mismatch: skip vs offset"
+    severity: P2
+    status: resolved
+    description: |
+      Frontend was sending `skip` query parameter for pagination, but backend
+      endpoint definition expected `offset`. This caused pagination to break
+      when frontend tried to skip/paginate through match results.
+
+    affected_files:
+      - src/opportunity_radar/api/v1/endpoints/matches.py
+
+    root_cause: |
+      Naming convention difference between frontend and backend. Frontend uses
+      semantic naming (skip = number of records to skip), backend used offset.
+      No validation layer caught this mismatch.
+
+    fix_applied: |
+      Updated list_matches() endpoint to accept both parameters for backwards
+      compatibility. Added deprecation note for offset. Implementation:
+
+      ```python
+      skip: int = Query(0, ge=0)
+      offset: Optional[int] = Query(None, ge=0, description="Deprecated: use skip instead")
+      actual_offset = offset if offset is not None else skip
+      ```
+
+    lines_changed: "20-35"
+    complexity: low
+    risk: low
+    test_coverage: pagination tests should verify both parameters work
+
+  - id: "005"
+    title: "SSRF vulnerability in URL extraction endpoint"
+    severity: P2
+    status: resolved
+    description: |
+      The /api/v1/onboarding/extract endpoint accepted arbitrary URLs without
+      proper validation, allowing potential Server-Side Request Forgery attacks
+      against internal networks, cloud metadata endpoints, and private IP ranges.
+
+    affected_files:
+      - src/opportunity_radar/services/onboarding_service.py
+
+    root_cause: |
+      URL extraction from user input was passed directly to HTTP client without
+      validating the target. Attacker could request internal services, AWS
+      metadata endpoints (169.254.169.254), or private network addresses.
+
+    fix_applied: |
+      Implemented comprehensive SSRF protection with validate_url_for_ssrf()
+      function that checks:
+
+      - Allowed schemes (http/https only)
+      - Blocked hostnames (localhost, metadata.google.internal, etc.)
+      - Blocked IP ranges (127.0.0.0/8, 10.0.0.0/8, 192.168.0.0/16, etc.)
+      - DNS resolution with IP validation against blocked ranges
+      - IPv6 private ranges (fc00::/7, fe80::/10)
+
+      Called before any network requests in extract_profile_from_url():
+      `validate_url_for_ssrf(url)  # line 229`
+
+    lines_changed: "22-92, 229"
+    complexity: medium
+    risk: high (security)
+    test_coverage: should add integration tests for blocked IP ranges
+
+  - id: "006"
+    title: "Industries data loss during onboarding confirmation"
+    severity: P2
+    status: resolved
+    description: |
+      The onboarding flow captured industries from URL extraction but the
+      confirm_profile() endpoint did not persist this data to the Profile
+      document. Users' industry preferences were lost after onboarding.
+
+    affected_files:
+      - src/opportunity_radar/services/onboarding_service.py
+
+    root_cause: |
+      The OnboardingConfirmRequest schema accepted industries field, but
+      confirm_profile() method did not save it to the Profile model. This
+      broke data continuity from extraction phase to profile creation.
+
+    fix_applied: |
+      Updated both create and update paths in confirm_profile() to persist
+      industries field:
+
+      - Line 559: `existing.industries = data.industries or []`
+      - Line 582: `industries=data.industries or []` (in Profile constructor)
+
+      Industries are now persisted and available for matching calculations.
+
+    lines_changed: "559, 582"
+    complexity: low
+    risk: low
+    test_coverage: onboarding confirmation tests should verify industries persistence
+
+  - id: "003"
+    title: "Stale matches accumulation on recomputation"
+    severity: P2
+    status: resolved
+    description: |
+      When match calculations were recomputed, old match records were never
+      deleted, causing stale/outdated opportunities to persist in the user's
+      match list. Only new matches were added, never cleaned up.
+
+    affected_files:
+      - src/opportunity_radar/services/mongo_matching_service.py
+
+    root_cause: |
+      The save_matches() method only created/updated match documents but never
+      deleted matches that were no longer in the computed results. This is a
+      data accumulation problem where dismissed/outdated opportunities stayed
+      in the database.
+
+    fix_applied: |
+      Implemented smart cleanup in save_matches() method (lines 529-544) that:
+
+      1. Collects opportunity IDs from newly computed matches
+      2. Deletes old matches that are:
+         - Not in the new results AND
+         - Not bookmarked by user AND
+         - Not dismissed by user
+      3. Preserves user actions (bookmarks/dismissals)
+
+      This ensures stale matches are cleaned while user preferences persist:
+      ```python
+      await Match.find(
+          Match.user_id == user_oid,
+          NotIn(Match.opportunity_id, list(new_opp_ids)),
+          Match.is_bookmarked == False,
+          Match.is_dismissed == False,
+      ).delete()
+      ```
+
+    lines_changed: "510-544"
+    complexity: medium
+    risk: medium
+    test_coverage: should test cleanup with various match states
+
+fixed_issues_summary:
+  total_p2_issues: 5
+  fixed: 5
+  remaining: 0
+  additional_p3_issues_identified: 4
+
+remaining_issues:
+  - title: "Match filtering by dismissed status"
+    severity: P3
+    description: "Filter logic may not work correctly with boolean query parameters in Beanie"
+  - title: "Opportunity embedding generation"
+    severity: P3
+    description: "No validation that opportunities have embeddings before matching"
+  - title: "Error handling in background tasks"
+    severity: P3
+    description: "Match computation failures in background tasks may not surface to user"
+  - title: "Profile embedding regeneration"
+    severity: P3
+    description: "Industries field is used in embedding but there's no migration for existing profiles"
+
+files_modified:
+  backend:
+    - src/opportunity_radar/api/v1/endpoints/matches.py
+    - src/opportunity_radar/api/v1/endpoints/onboarding.py
+    - src/opportunity_radar/services/onboarding_service.py
+    - src/opportunity_radar/services/mongo_matching_service.py
+    - src/opportunity_radar/models/profile.py
+
+  frontend:
+    - frontend/services/api-client.ts
+    - frontend/stores/onboarding-store.ts
+    - frontend/stores/auth-store.ts
+    - frontend/app/(auth)/oauth/callback/page.tsx
+    - frontend/app/(dashboard)/dashboard/page.tsx
+    - frontend/app/(dashboard)/layout.tsx
+    - frontend/app/(dashboard)/opportunities/page.tsx
+    - frontend/app/(dashboard)/pipeline/page.tsx
+    - frontend/app/layout.tsx
+    - frontend/components/ui/modal.tsx
+    - frontend/components/ui/switch.tsx
+    - frontend/components/ui/tabs.tsx
+
+testing_recommendations:
+  - Add SSRF validation tests with various IP ranges and metadata endpoints
+  - Add integration tests for pagination using both skip and offset parameters
+  - Add tests verifying industries field persistence through onboarding flow
+  - Add tests verifying stale match cleanup preserves bookmarked/dismissed matches
+  - Add regression tests for batch_id field in match responses
+
+code_quality_notes:
+  security_improvements: |
+    - Comprehensive SSRF protection with IP range validation
+    - DNS resolution and verification against blocked ranges
+    - Support for both IPv4 and IPv6 private ranges
+
+  data_integrity_improvements: |
+    - Smart match cleanup that respects user actions
+    - Industries field properly persisted through profile lifecycle
+    - Proper error handling for missing embeddings
+
+  api_design_improvements: |
+    - Backwards compatible pagination parameter naming
+    - Computed response fields (batch_id) for frontend compatibility
+    - Consistent match enrichment across endpoints
+
+reviewers:
+  - Codex (automated code review)
+
+approval_status: "All P2 issues resolved"

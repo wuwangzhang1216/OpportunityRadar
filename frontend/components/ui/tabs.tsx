@@ -10,11 +10,12 @@ interface TabsProps {
     id: string;
     label: string;
     icon?: React.ReactNode;
-    content: React.ReactNode;
+    content?: React.ReactNode;
     badge?: string | number;
   }[];
   defaultIndex?: number;
-  onChange?: (index: number) => void;
+  activeTab?: string;
+  onChange?: (tabIdOrIndex: string | number) => void;
   variant?: "default" | "pills" | "underline";
   className?: string;
 }
@@ -22,16 +23,36 @@ interface TabsProps {
 export function Tabs({
   tabs,
   defaultIndex = 0,
+  activeTab,
   onChange,
   variant = "default",
   className,
 }: TabsProps) {
-  const [selectedIndex, setSelectedIndex] = React.useState(defaultIndex);
+  // Determine initial index from activeTab or defaultIndex
+  const initialIndex = activeTab
+    ? tabs.findIndex((t) => t.id === activeTab)
+    : defaultIndex;
+  const [selectedIndex, setSelectedIndex] = React.useState(
+    initialIndex >= 0 ? initialIndex : 0
+  );
+
+  // Sync with external activeTab prop
+  React.useEffect(() => {
+    if (activeTab) {
+      const index = tabs.findIndex((t) => t.id === activeTab);
+      if (index >= 0 && index !== selectedIndex) {
+        setSelectedIndex(index);
+      }
+    }
+  }, [activeTab, tabs, selectedIndex]);
 
   const handleChange = (index: number) => {
     setSelectedIndex(index);
-    onChange?.(index);
+    // Pass tab id if activeTab mode is being used, otherwise pass index
+    onChange?.(activeTab !== undefined ? tabs[index].id : index);
   };
+
+  const hasContent = tabs.some((tab) => tab.content !== undefined);
 
   return (
     <Tab.Group selectedIndex={selectedIndex} onChange={handleChange}>
@@ -96,19 +117,21 @@ export function Tabs({
         ))}
       </Tab.List>
 
-      <Tab.Panels className="mt-4">
-        {tabs.map((tab) => (
-          <Tab.Panel
-            key={tab.id}
-            className={cn(
-              "rounded-xl focus:outline-none",
-              "animate-fade-in"
-            )}
-          >
-            {tab.content}
-          </Tab.Panel>
-        ))}
-      </Tab.Panels>
+      {hasContent && (
+        <Tab.Panels className="mt-4">
+          {tabs.map((tab) => (
+            <Tab.Panel
+              key={tab.id}
+              className={cn(
+                "rounded-xl focus:outline-none",
+                "animate-fade-in"
+              )}
+            >
+              {tab.content}
+            </Tab.Panel>
+          ))}
+        </Tab.Panels>
+      )}
     </Tab.Group>
   );
 }

@@ -8,11 +8,17 @@ const ssrStorage = {
   removeItem: () => {},
 };
 
+interface OAuthConnection {
+  provider: string;
+  connected_at?: string;
+}
+
 interface User {
   id: string;
   email: string;
   full_name: string;
   has_profile: boolean;
+  oauth_connections?: OAuthConnection[];
 }
 
 interface AuthState {

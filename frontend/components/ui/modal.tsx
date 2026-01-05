@@ -10,6 +10,7 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  title?: string;
   className?: string;
   size?: "sm" | "md" | "lg" | "xl" | "full";
   showCloseButton?: boolean;
@@ -27,6 +28,7 @@ export function Modal({
   isOpen,
   onClose,
   children,
+  title,
   className,
   size = "md",
   showCloseButton = true,
@@ -73,6 +75,14 @@ export function Modal({
                   >
                     <X className="h-5 w-5" />
                   </button>
+                )}
+                {title && (
+                  <Dialog.Title
+                    as="h3"
+                    className="text-xl font-semibold leading-6 text-gray-900 mb-4"
+                  >
+                    {title}
+                  </Dialog.Title>
                 )}
                 {children}
               </Dialog.Panel>
