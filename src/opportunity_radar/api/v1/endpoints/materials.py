@@ -79,7 +79,7 @@ async def generate_materials(
 
         opp_context = OpportunityContext(
             title=opportunity.title,
-            themes=opportunity.tags or [],
+            themes=opportunity.themes or [],
         )
 
     # Build project context from request
