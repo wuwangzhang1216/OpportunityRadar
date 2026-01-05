@@ -125,6 +125,16 @@ class ApiClient {
     return response.data;
   }
 
+  async getMatchStatus() {
+    const response = await this.client.get("/matches/status");
+    return response.data;
+  }
+
+  async calculateMatches() {
+    const response = await this.client.post("/matches/calculate");
+    return response.data;
+  }
+
   async dismissMatch(matchId: string) {
     const response = await this.client.post(`/matches/${matchId}/dismiss`);
     return response.data;

@@ -40,6 +40,7 @@ class Profile(Document):
     preferred_team_size_max: int = 5
     goals: List[str] = Field(default_factory=list)
     interests: List[str] = Field(default_factory=list)
+    industries: List[str] = Field(default_factory=list)  # e.g., FinTech, HealthTech, AI/ML
     location_country: Optional[str] = None
     location_region: Optional[str] = None
     student_status: Optional[str] = None
@@ -76,6 +77,7 @@ class Profile(Document):
     embedding: Optional[List[float]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    last_match_computation: Optional[datetime] = None  # Track when matches were last computed
 
     class Settings:
         name = "profiles"

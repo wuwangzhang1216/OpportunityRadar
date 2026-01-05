@@ -1,14 +1,94 @@
 """Onboarding service for URL scraping and LLM-based profile extraction."""
 
+import ipaddress
 import json
 import logging
 import re
+import socket
 from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 from openai import OpenAI
+
+
+class SSRFProtectionError(Exception):
+    """Raised when a URL fails SSRF validation."""
+
+    pass
+
+
+def validate_url_for_ssrf(url: str) -> None:
+    """
+    Validate a URL to prevent Server-Side Request Forgery (SSRF) attacks.
+
+    Raises:
+        SSRFProtectionError: If the URL is potentially malicious
+    """
+    ALLOWED_SCHEMES = {"http", "https"}
+    BLOCKED_IP_RANGES = [
+        ipaddress.ip_network("127.0.0.0/8"),  # Localhost
+        ipaddress.ip_network("10.0.0.0/8"),  # Private network
+        ipaddress.ip_network("192.168.0.0/16"),  # Private network
+        ipaddress.ip_network("172.16.0.0/12"),  # Private network
+        ipaddress.ip_network("169.254.0.0/16"),  # Link-local (AWS metadata)
+        ipaddress.ip_network("0.0.0.0/8"),  # Current network
+        ipaddress.ip_network("100.64.0.0/10"),  # Carrier-grade NAT
+        ipaddress.ip_network("::1/128"),  # IPv6 localhost
+        ipaddress.ip_network("fc00::/7"),  # IPv6 private
+        ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
+    ]
+    BLOCKED_HOSTNAMES = {
+        "localhost",
+        "metadata.google.internal",
+        "metadata",
+        "instance-data",
+    }
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        raise SSRFProtectionError("Invalid URL format")
+
+    # Check scheme
+    if parsed.scheme.lower() not in ALLOWED_SCHEMES:
+        raise SSRFProtectionError(f"URL scheme '{parsed.scheme}' not allowed. Use http or https.")
+
+    # Check hostname exists
+    hostname = parsed.hostname
+    if not hostname:
+        raise SSRFProtectionError("URL must have a valid hostname")
+
+    # Check blocked hostnames
+    hostname_lower = hostname.lower()
+    if hostname_lower in BLOCKED_HOSTNAMES:
+        raise SSRFProtectionError(f"Hostname '{hostname}' is not allowed")
+
+    # Check for cloud metadata patterns
+    if "169.254" in hostname or "metadata" in hostname_lower:
+        raise SSRFProtectionError("Access to metadata endpoints is not allowed")
+
+    # Resolve hostname to IP and check against blocked ranges
+    try:
+        # Get all IP addresses for the hostname
+        addr_info = socket.getaddrinfo(hostname, parsed.port or 443, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _, _, _, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            try:
+                ip = ipaddress.ip_address(ip_str)
+                for blocked_range in BLOCKED_IP_RANGES:
+                    if ip in blocked_range:
+                        raise SSRFProtectionError(f"Access to internal network ({ip}) is not allowed")
+            except ValueError:
+                continue  # Not a valid IP, skip
+    except socket.gaierror:
+        raise SSRFProtectionError(f"Could not resolve hostname: {hostname}")
+    except SSRFProtectionError:
+        raise
+    except Exception as e:
+        # Log but don't block on unexpected errors during resolution
+        logging.getLogger(__name__).warning(f"URL validation warning for {url}: {e}")
 
 from ..config import get_settings
 from ..models.profile import Profile
@@ -104,12 +184,16 @@ def normalize_goals(goals: list[str]) -> list[str]:
 class OnboardingService:
     """Service for onboarding flow with URL extraction."""
 
+    MAX_REDIRECTS = 5  # Limit redirect hops to prevent loops
+
     def __init__(self):
         settings = get_settings()
         self.openai_client = OpenAI(api_key=settings.openai_api_key)
+        # SECURITY: Disable automatic redirects to prevent SSRF bypass
+        # Redirects are handled manually with SSRF validation on each hop
         self.http_client = httpx.AsyncClient(
             timeout=30.0,
-            follow_redirects=True,
+            follow_redirects=False,  # Manual redirect handling for SSRF safety
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             },
@@ -118,6 +202,53 @@ class OnboardingService:
     async def close(self):
         """Close HTTP client."""
         await self.http_client.aclose()
+
+    async def _safe_get(self, url: str) -> httpx.Response:
+        """
+        Perform a GET request with SSRF-safe redirect handling.
+
+        Each redirect hop is validated against SSRF protection rules.
+
+        Args:
+            url: The URL to fetch
+
+        Returns:
+            The final response after following redirects
+
+        Raises:
+            SSRFProtectionError: If any URL in the redirect chain fails validation
+            httpx.TooManyRedirects: If redirect limit is exceeded
+        """
+        current_url = url
+        for _ in range(self.MAX_REDIRECTS):
+            # Validate current URL for SSRF before making request
+            validate_url_for_ssrf(current_url)
+
+            response = await self.http_client.get(current_url)
+
+            # Check if this is a redirect
+            if response.status_code in (301, 302, 303, 307, 308):
+                location = response.headers.get("location")
+                if not location:
+                    return response  # No location header, return as-is
+
+                # Handle relative redirects
+                if location.startswith("/"):
+                    parsed = urlparse(current_url)
+                    current_url = f"{parsed.scheme}://{parsed.netloc}{location}"
+                else:
+                    current_url = location
+
+                # Validate redirect target (will raise SSRFProtectionError if blocked)
+                # This prevents redirect-based SSRF bypasses
+                continue
+
+            return response
+
+        raise httpx.TooManyRedirects(
+            f"Exceeded maximum redirects ({self.MAX_REDIRECTS})",
+            request=httpx.Request("GET", url),
+        )
 
     def detect_url_type(self, url: str) -> URLType:
         """Detect if URL is a website or GitHub repo."""
@@ -137,7 +268,17 @@ class OnboardingService:
 
         Returns:
             ExtractedProfile with AI-extracted fields
+
+        Raises:
+            SSRFProtectionError: If the URL fails security validation
         """
+        # Ensure URL has scheme for validation
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+
+        # SSRF protection: validate URL before any network requests
+        validate_url_for_ssrf(url)
+
         url_type = self.detect_url_type(url)
         logger.info(f"Extracting profile from URL: {url}, type: {url_type}")
 
@@ -205,7 +346,7 @@ class OnboardingService:
     async def _fetch_page_text(self, url: str) -> Optional[str]:
         """Fetch and extract text from a single page."""
         try:
-            response = await self.http_client.get(url)
+            response = await self._safe_get(url)
             if response.status_code != 200:
                 return None
 
@@ -466,6 +607,7 @@ If a field cannot be determined, omit it from the response."""
             existing.bio = data.bio
             existing.tech_stack = data.tech_stack
             existing.interests = data.interests
+            existing.industries = data.industries or []
             existing.goals = normalized_goals
             existing.experience_level = data.experience_level
             existing.preferred_team_size_min = 1
@@ -488,6 +630,7 @@ If a field cannot be determined, omit it from the response."""
             bio=data.bio,
             tech_stack=data.tech_stack,
             interests=data.interests,
+            industries=data.industries or [],
             goals=normalized_goals,
             experience_level=data.experience_level,
             preferred_team_size_min=1,

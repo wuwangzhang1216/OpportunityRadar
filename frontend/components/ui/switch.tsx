@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 
 interface SwitchProps {
   checked: boolean;
-  onChange: (checked: boolean) => void;
+  onChange?: (checked: boolean) => void;
+  onCheckedChange?: (checked: boolean) => void;
   disabled?: boolean;
   size?: "sm" | "md" | "lg";
   variant?: "default" | "success" | "ai";
@@ -42,6 +43,7 @@ const variantClasses = {
 export function Switch({
   checked,
   onChange,
+  onCheckedChange,
   disabled = false,
   size = "md",
   variant = "default",
@@ -50,13 +52,14 @@ export function Switch({
   className,
 }: SwitchProps) {
   const sizes = sizeClasses[size];
+  const handleChange = onChange || onCheckedChange;
 
   return (
     <HeadlessSwitch.Group>
       <div className={cn("flex items-center gap-3", className)}>
         <HeadlessSwitch
           checked={checked}
-          onChange={onChange}
+          onChange={handleChange}
           disabled={disabled}
           className={cn(
             "relative inline-flex shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",

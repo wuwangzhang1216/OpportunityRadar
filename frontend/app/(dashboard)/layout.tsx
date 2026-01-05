@@ -27,11 +27,18 @@ import { useAuthStore } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/services/api-client";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/opportunities", label: "Opportunities", icon: Search },
-  { href: "/pipeline", label: "Pipeline", icon: Kanban },
-  { href: "/generator", label: "AI Generator", icon: Sparkles },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  tourId?: string;
+}
+
+const navItems: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tourId: "dashboard-nav" },
+  { href: "/opportunities", label: "Opportunities", icon: Search, tourId: "opportunities-nav" },
+  { href: "/pipeline", label: "Pipeline", icon: Kanban, tourId: "pipeline-nav" },
+  { href: "/generator", label: "AI Generator", icon: Sparkles, tourId: "generator-nav" },
   { href: "/materials", label: "My Materials", icon: FileText },
   { href: "/teams", label: "Teams", icon: Users },
   { href: "/community", label: "Community", icon: Globe },
@@ -40,7 +47,7 @@ const navItems = [
   { href: "/profile", label: "Profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
-const adminNavItem = { href: "/admin", label: "Admin", icon: Settings };
+const adminNavItem: NavItem = { href: "/admin", label: "Admin", icon: Settings };
 
 export default function DashboardLayout({
   children,
@@ -209,7 +216,7 @@ export default function DashboardLayout({
             {menuItems.map((item) => {
               const isActive = pathname === item.href;
               return (
-                <Link key={item.href} href={item.href}>
+                <Link key={item.href} href={item.href} data-tour={item.tourId}>
                   <motion.div
                     whileHover={{ x: 4 }}
                     whileTap={{ scale: 0.98 }}

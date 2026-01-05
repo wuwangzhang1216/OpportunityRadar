@@ -22,7 +22,14 @@ import { apiClient } from "@/services/api-client";
 import { formatRelativeTime } from "@/lib/utils";
 import Link from "next/link";
 
-const stages = [
+interface Stage {
+  id: string;
+  label: string;
+  color: string;
+  textColor: string;
+}
+
+const stages: Stage[] = [
   { id: "discovered", label: "Discovered", color: "bg-gray-400", textColor: "text-gray-600" },
   { id: "preparing", label: "Preparing", color: "bg-yellow-500", textColor: "text-yellow-600" },
   { id: "submitted", label: "Submitted", color: "bg-blue-500", textColor: "text-blue-600" },
@@ -251,7 +258,7 @@ export default function PipelinePage() {
 function PipelineCard({
   item,
   currentStage,
-  stages,
+  stages: stagesParam,
   onMove,
   onDelete,
   onArchive,
@@ -261,7 +268,7 @@ function PipelineCard({
 }: {
   item: any;
   currentStage: string;
-  stages: typeof stages;
+  stages: Stage[];
   onMove: (stage: string) => void;
   onDelete: () => void;
   onArchive: () => void;
@@ -269,6 +276,8 @@ function PipelineCard({
   onDragEnd: () => void;
   isDragging: boolean;
 }) {
+  // Use the passed stages parameter
+  const stages = stagesParam;
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

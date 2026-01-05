@@ -5,6 +5,7 @@ utilizing OpenAI embeddings for semantic similarity scoring with multi-factor sc
 hard filters, and human-readable explanations.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -223,9 +224,13 @@ class MongoMatchingService:
             logger.info("No opportunities found for matching")
             return []
 
-        # Compute matches
+        # Compute matches with yield points to prevent event loop blocking
         matches = []
-        for opp in opportunities:
+        for i, opp in enumerate(opportunities):
+            # Yield every 50 opportunities to allow other async tasks to run
+            if i > 0 and i % 50 == 0:
+                await asyncio.sleep(0)
+
             result = self._compute_single_match(profile, opp)
 
             # Apply hard filters
@@ -507,6 +512,9 @@ class MongoMatchingService:
         """
         Save computed matches to database.
 
+        Cleans up stale matches (non-bookmarked, non-dismissed) that are no longer
+        in the computed results, while preserving user actions (bookmarks/dismissals).
+
         Args:
             user_id: The user ID
             match_results: List of match results to save
@@ -515,9 +523,30 @@ class MongoMatchingService:
             Number of matches saved/updated
         """
         from beanie import PydanticObjectId
+        from beanie.operators import In, NotIn
 
         count = 0
         user_oid = PydanticObjectId(user_id)
+
+        # Get the opportunity IDs from new match results
+        new_opp_ids = {PydanticObjectId(r.opportunity_id) for r in match_results}
+
+        # Clean up stale matches: remove matches for opportunities no longer in results
+        # BUT preserve bookmarked and dismissed matches (user actions should persist)
+        if new_opp_ids:
+            await Match.find(
+                Match.user_id == user_oid,
+                NotIn(Match.opportunity_id, list(new_opp_ids)),
+                Match.is_bookmarked == False,
+                Match.is_dismissed == False,
+            ).delete()
+        else:
+            # If no new matches, still clean up non-actioned matches
+            await Match.find(
+                Match.user_id == user_oid,
+                Match.is_bookmarked == False,
+                Match.is_dismissed == False,
+            ).delete()
 
         for result in match_results:
             opp_oid = PydanticObjectId(result.opportunity_id)
@@ -552,6 +581,12 @@ class MongoMatchingService:
                 )
                 await match.insert()
                 count += 1
+
+        # Update profile's last_match_computation timestamp
+        profile = await Profile.find_one(Profile.user_id == user_oid)
+        if profile:
+            profile.last_match_computation = datetime.utcnow()
+            await profile.save()
 
         return count
 

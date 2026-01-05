@@ -23,8 +23,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/services/api-client";
 import { formatDate, formatCurrency, formatRelativeTime } from "@/lib/utils";
+import type { Match } from "@/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { NoMatchesEmptyState, NoOpportunitiesEmptyState } from "@/components/ui/empty-state";
 
 const categories = [
   { value: "", label: "All" },
@@ -62,7 +64,7 @@ export default function OpportunitiesPage() {
   });
 
   // Filter by search and category on client side (matches API doesn't support these)
-  const filteredItems = data?.items?.filter((match: any) => {
+  const filteredItems = data?.items?.filter((match: Match) => {
     const matchesSearch = !search ||
       match.opportunity_title?.toLowerCase().includes(search.toLowerCase()) ||
       match.opportunity_description?.toLowerCase().includes(search.toLowerCase());
@@ -148,7 +150,7 @@ export default function OpportunitiesPage() {
             {filter === "dismissed" && " (dismissed)"}
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredItems.map((match: any) => (
+            {filteredItems.map((match: Match) => (
               <MatchCard key={match.id || match._id} match={match} />
             ))}
           </div>
@@ -176,39 +178,46 @@ export default function OpportunitiesPage() {
             </div>
           )}
         </>
-      ) : (
+      ) : data?.total === 0 && filter === "all" && !search && !category ? (
+        // No matches at all - profile likely incomplete
+        <NoMatchesEmptyState />
+      ) : filter === "bookmarked" ? (
         <div className="text-center py-12">
-          <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium text-foreground">
-            {filter === "bookmarked"
-              ? "No bookmarked opportunities"
-              : filter === "dismissed"
-              ? "No dismissed opportunities"
-              : "No opportunities found"}
-          </h3>
+          <Bookmark className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium text-foreground">No bookmarked opportunities</h3>
           <p className="text-muted-foreground mt-1">
-            {filter === "bookmarked"
-              ? "Bookmark opportunities you're interested in to see them here"
-              : filter === "dismissed"
-              ? "Dismissed opportunities will appear here"
-              : "Try adjusting your search or filters"}
+            Bookmark opportunities you're interested in to see them here
           </p>
-          {filter !== "all" && (
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => setFilter("all")}
-            >
-              View all opportunities
-            </Button>
-          )}
+          <Button variant="outline" className="mt-4" onClick={() => setFilter("all")}>
+            View all opportunities
+          </Button>
         </div>
+      ) : filter === "dismissed" ? (
+        <div className="text-center py-12">
+          <X className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium text-foreground">No dismissed opportunities</h3>
+          <p className="text-muted-foreground mt-1">
+            Dismissed opportunities will appear here
+          </p>
+          <Button variant="outline" className="mt-4" onClick={() => setFilter("all")}>
+            View all opportunities
+          </Button>
+        </div>
+      ) : (
+        // Filtered results empty
+        <NoOpportunitiesEmptyState
+          onClearFilters={() => {
+            setSearch("");
+            setCategory("");
+            setFilter("all");
+          }}
+        />
       )}
     </div>
   );
 }
 
-function MatchCard({ match }: { match: any }) {
+function MatchCard({ match }: { match: Match }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const matchId = match.id || match._id;
