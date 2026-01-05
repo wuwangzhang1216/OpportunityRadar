@@ -42,11 +42,24 @@ class Settings(BaseSettings):
     # LLM Provider
     llm_provider: str = "openai"
 
+    # OAuth - GitHub
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    github_redirect_uri: str = "http://localhost:3000/auth/github/callback"
+
+    # OAuth - Google
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:3000/auth/google/callback"
+
     # Scraper
     scraper_devpost_enabled: bool = True
     scraper_mlh_enabled: bool = True
     scraper_interval_hours: int = 6
     scraper_request_delay_seconds: float = 2.0
+
+    # API
+    api_base_url: str = "http://localhost:8000"
 
     # CORS
     cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8000"]

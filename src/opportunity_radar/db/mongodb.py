@@ -22,6 +22,10 @@ async def init_db():
     from ..models.pipeline import Pipeline
     from ..models.material import Material
     from ..models.scraper_run import ScraperRun
+    from ..models.notification import Notification, NotificationPreferences
+    from ..models.team import Team
+    from ..models.submission import OpportunitySubmission
+    from ..models.shared_list import SharedList
 
     await init_beanie(
         database=client[settings.mongodb_database],
@@ -34,6 +38,11 @@ async def init_db():
             Pipeline,
             Material,
             ScraperRun,
+            Notification,
+            NotificationPreferences,
+            Team,
+            OpportunitySubmission,
+            SharedList,
         ]
     )
 

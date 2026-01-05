@@ -1,12 +1,13 @@
 """MongoDB-based matching service for computing matches with embeddings.
 
 This service uses MongoDB models (Beanie) for matching profiles with opportunities,
-utilizing OpenAI embeddings for semantic similarity scoring.
+utilizing OpenAI embeddings for semantic similarity scoring with multi-factor scoring,
+hard filters, and human-readable explanations.
 """
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -21,33 +22,59 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MatchScoreBreakdown:
-    """Detailed breakdown of match score."""
+    """Detailed breakdown of match score with multi-factor scoring."""
 
-    semantic_score: float = 0.0  # 0-1, from embedding similarity
-    tech_overlap_score: float = 0.0  # 0-1, from tech stack overlap
-    goals_alignment_score: float = 0.0  # 0-1, from goals matching
-    time_score: float = 0.0  # 0-1, from deadline proximity
+    # Similarity Scores (0-1)
+    semantic_score: float = 0.0  # Semantic embedding similarity
+    tech_overlap_score: float = 0.0  # Tech stack overlap
+    industry_alignment_score: float = 0.0  # Industry/theme alignment
+    goals_alignment_score: float = 0.0  # Goals matching
+
+    # Timing Score (0-1)
+    deadline_score: float = 0.0  # Penalize near deadlines
+
+    # Eligibility (boolean, used for hard filtering)
+    team_size_eligible: bool = True
+    funding_stage_eligible: bool = True
+    location_eligible: bool = True
+
+    # Boost Factors
+    track_record_boost: float = 0.0  # Past success indicators
 
     # Weights
-    semantic_weight: float = 0.40
-    tech_weight: float = 0.25
-    goals_weight: float = 0.20
-    time_weight: float = 0.15
+    semantic_weight: float = 0.30
+    tech_weight: float = 0.20
+    industry_weight: float = 0.15
+    goals_weight: float = 0.15
+    deadline_weight: float = 0.10
+    track_record_weight: float = 0.10
+
+    @property
+    def is_eligible(self) -> bool:
+        """Check if all hard eligibility requirements are met."""
+        return self.team_size_eligible and self.funding_stage_eligible and self.location_eligible
 
     @property
     def total_score(self) -> float:
         """Calculate weighted total score."""
-        return (
+        if not self.is_eligible:
+            return 0.0
+
+        base_score = (
             self.semantic_score * self.semantic_weight
             + self.tech_overlap_score * self.tech_weight
+            + self.industry_alignment_score * self.industry_weight
             + self.goals_alignment_score * self.goals_weight
-            + self.time_score * self.time_weight
+            + self.deadline_score * self.deadline_weight
+            + self.track_record_boost * self.track_record_weight
         )
+        return min(1.0, base_score)
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
         return {
             "total": round(self.total_score, 3),
+            "is_eligible": self.is_eligible,
             "factors": {
                 "semantic": {
                     "score": round(self.semantic_score, 3),
@@ -57,15 +84,48 @@ class MatchScoreBreakdown:
                     "score": round(self.tech_overlap_score, 3),
                     "weight": self.tech_weight,
                 },
+                "industry_alignment": {
+                    "score": round(self.industry_alignment_score, 3),
+                    "weight": self.industry_weight,
+                },
                 "goals_alignment": {
                     "score": round(self.goals_alignment_score, 3),
                     "weight": self.goals_weight,
                 },
-                "time": {
-                    "score": round(self.time_score, 3),
-                    "weight": self.time_weight,
+                "deadline": {
+                    "score": round(self.deadline_score, 3),
+                    "weight": self.deadline_weight,
+                },
+                "track_record": {
+                    "score": round(self.track_record_boost, 3),
+                    "weight": self.track_record_weight,
                 },
             },
+            "eligibility": {
+                "team_size": self.team_size_eligible,
+                "funding_stage": self.funding_stage_eligible,
+                "location": self.location_eligible,
+            },
+        }
+
+
+@dataclass
+class MatchExplanation:
+    """Human-readable match explanation."""
+
+    primary_reason: str
+    matching_skills: List[str] = field(default_factory=list)
+    matching_themes: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    tips: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict:
+        return {
+            "primary_reason": self.primary_reason,
+            "matching_skills": self.matching_skills,
+            "matching_themes": self.matching_themes,
+            "warnings": self.warnings,
+            "tips": self.tips,
         }
 
 
@@ -76,6 +136,7 @@ class MatchResult:
     opportunity_id: str
     score: float
     breakdown: MatchScoreBreakdown
+    explanation: MatchExplanation
     match_reasons: List[str] = field(default_factory=list)
     eligibility_issues: List[str] = field(default_factory=list)
     suggestions: List[str] = field(default_factory=list)
@@ -84,13 +145,22 @@ class MatchResult:
 # Goal to opportunity type mapping
 GOAL_TYPE_MAPPING = {
     "funding": ["grant", "accelerator", "competition"],
-    "prizes": ["hackathon", "competition", "bug-bounty"],
+    "prizes": ["hackathon", "competition", "bug-bounty", "bounty"],
     "learning": ["hackathon", "competition", "bootcamp"],
     "networking": ["hackathon", "accelerator", "conference"],
     "exposure": ["hackathon", "competition", "accelerator"],
     "mentorship": ["accelerator", "bootcamp"],
     "equity": ["accelerator"],
     "building": ["hackathon", "buildathon"],
+}
+
+# Funding stage to accelerator stage mapping
+FUNDING_STAGE_MAPPING = {
+    "bootstrapped": ["pre-seed", "idea", "early"],
+    "pre_seed": ["pre-seed", "seed", "early"],
+    "seed": ["seed", "early", "growth"],
+    "series_a": ["series-a", "growth", "scaling"],
+    "series_b_plus": ["growth", "scaling", "late"],
 }
 
 
@@ -113,6 +183,7 @@ class MongoMatchingService:
         limit: int = 50,
         min_score: float = 0.3,
         only_active: bool = True,
+        apply_hard_filters: bool = True,
     ) -> List[MatchResult]:
         """
         Compute matches for a profile against all active opportunities.
@@ -122,6 +193,7 @@ class MongoMatchingService:
             limit: Maximum number of matches to return
             min_score: Minimum score threshold
             only_active: Only match against active opportunities
+            apply_hard_filters: Apply team size, eligibility filters
 
         Returns:
             List of match results sorted by score
@@ -155,6 +227,11 @@ class MongoMatchingService:
         matches = []
         for opp in opportunities:
             result = self._compute_single_match(profile, opp)
+
+            # Apply hard filters
+            if apply_hard_filters and not result.breakdown.is_eligible:
+                continue
+
             if result.score >= min_score:
                 matches.append(result)
 
@@ -173,15 +250,22 @@ class MongoMatchingService:
         match_reasons = []
         eligibility_issues = []
         suggestions = []
+        matching_skills = []
+        matching_themes = []
+        warnings = []
+        tips = []
 
-        # 1. Semantic similarity (embeddings)
+        # 1. Apply hard filters (eligibility checks)
+        self._apply_hard_filters(profile, opportunity, breakdown, eligibility_issues)
+
+        # 2. Semantic similarity (embeddings)
         if profile.embedding and opportunity.embedding:
             breakdown.semantic_score = self._cosine_similarity(
                 profile.embedding, opportunity.embedding
             )
-            if breakdown.semantic_score > 0.7:
+            if breakdown.semantic_score > 0.75:
                 match_reasons.append("Strong semantic alignment with your profile")
-            elif breakdown.semantic_score > 0.5:
+            elif breakdown.semantic_score > 0.6:
                 match_reasons.append("Good semantic match")
         else:
             # Default to neutral if no embeddings
@@ -189,25 +273,42 @@ class MongoMatchingService:
             if not opportunity.embedding:
                 suggestions.append("Opportunity lacks embedding - semantic matching unavailable")
 
-        # 2. Tech stack overlap
+        # 3. Tech stack overlap
         profile_tech = set(t.lower() for t in (profile.tech_stack or []))
         opp_tech = set(t.lower() for t in (opportunity.technologies or []))
 
         if profile_tech and opp_tech:
-            overlap = len(profile_tech & opp_tech)
-            union = len(profile_tech | opp_tech)
-            breakdown.tech_overlap_score = overlap / union if union > 0 else 0.0
+            overlap = profile_tech & opp_tech
+            union = profile_tech | opp_tech
+            breakdown.tech_overlap_score = len(overlap) / len(union) if union else 0.0
+            matching_skills = list(overlap)[:5]
 
             if breakdown.tech_overlap_score > 0.5:
-                match_reasons.append("Strong tech stack overlap")
+                match_reasons.append(f"Strong tech stack overlap: {', '.join(matching_skills[:3])}")
             elif breakdown.tech_overlap_score > 0.2:
                 match_reasons.append("Some tech stack overlap")
             elif breakdown.tech_overlap_score == 0 and opp_tech:
-                suggestions.append(f"Consider learning: {', '.join(list(opp_tech)[:3])}")
+                missing = list(opp_tech - profile_tech)[:3]
+                tips.append(f"Consider learning: {', '.join(missing)}")
         else:
             breakdown.tech_overlap_score = 0.5  # Neutral if no tech requirements
 
-        # 3. Goals alignment
+        # 4. Industry/theme alignment
+        profile_industries = set(i.lower() for i in (profile.interests or []))
+        opp_themes = set(t.lower() for t in (opportunity.themes or []))
+
+        if profile_industries and opp_themes:
+            industry_overlap = profile_industries & opp_themes
+            industry_union = profile_industries | opp_themes
+            breakdown.industry_alignment_score = len(industry_overlap) / len(industry_union) if industry_union else 0.0
+            matching_themes = list(industry_overlap)[:5]
+
+            if breakdown.industry_alignment_score > 0.3:
+                match_reasons.append(f"Industry alignment: {', '.join(matching_themes[:3])}")
+        else:
+            breakdown.industry_alignment_score = 0.5
+
+        # 5. Goals alignment
         profile_goals = set(g.lower() for g in (profile.goals or []))
         opp_type = (opportunity.opportunity_type or "").lower()
 
@@ -225,18 +326,154 @@ class MongoMatchingService:
         else:
             breakdown.goals_alignment_score = 0.5
 
-        # 4. Time score (based on whether opportunity has timelines)
-        # For now, use neutral score since we need timeline data
-        breakdown.time_score = 0.7
+        # 6. Deadline score - encourage applying early
+        breakdown.deadline_score = self._calculate_deadline_score(opportunity, warnings)
+
+        # 7. Track record boost
+        breakdown.track_record_boost = self._calculate_track_record_boost(profile, opportunity, tips)
+
+        # Generate primary explanation
+        primary_reason = self._generate_primary_reason(breakdown, match_reasons)
+
+        explanation = MatchExplanation(
+            primary_reason=primary_reason,
+            matching_skills=matching_skills,
+            matching_themes=matching_themes,
+            warnings=warnings,
+            tips=tips,
+        )
 
         return MatchResult(
             opportunity_id=str(opportunity.id),
             score=breakdown.total_score,
             breakdown=breakdown,
+            explanation=explanation,
             match_reasons=match_reasons,
             eligibility_issues=eligibility_issues,
             suggestions=suggestions,
         )
+
+    def _apply_hard_filters(
+        self,
+        profile: Profile,
+        opportunity: Opportunity,
+        breakdown: MatchScoreBreakdown,
+        eligibility_issues: List[str],
+    ) -> None:
+        """Apply hard eligibility filters."""
+        # Team size check
+        profile_team_size = profile.team_size or 1
+        if opportunity.team_size_min and profile_team_size < opportunity.team_size_min:
+            breakdown.team_size_eligible = False
+            eligibility_issues.append(
+                f"Team size too small: need {opportunity.team_size_min}, have {profile_team_size}"
+            )
+        if opportunity.team_size_max and profile_team_size > opportunity.team_size_max:
+            breakdown.team_size_eligible = False
+            eligibility_issues.append(
+                f"Team size too large: max {opportunity.team_size_max}, have {profile_team_size}"
+            )
+
+        # Funding stage check for accelerators
+        if opportunity.opportunity_type == "accelerator" and profile.funding_stage:
+            # Most accelerators have stage requirements - this is simplified
+            breakdown.funding_stage_eligible = True  # Default to eligible
+
+        # Location check (simplified - would need opportunity location requirements)
+        breakdown.location_eligible = True
+
+    def _calculate_deadline_score(
+        self,
+        opportunity: Opportunity,
+        warnings: List[str],
+    ) -> float:
+        """Calculate deadline score - penalize near deadlines."""
+        # Check timelines for deadline
+        deadline = None
+        if opportunity.timelines:
+            for timeline in opportunity.timelines:
+                if isinstance(timeline, dict):
+                    deadline_str = timeline.get("submission_deadline") or timeline.get("registration_closes_at")
+                    if deadline_str:
+                        try:
+                            deadline = datetime.fromisoformat(deadline_str.replace("Z", "+00:00"))
+                        except (ValueError, AttributeError):
+                            pass
+                        break
+
+        if not deadline:
+            return 0.7  # Neutral score if no deadline
+
+        now = datetime.now(deadline.tzinfo) if deadline.tzinfo else datetime.utcnow()
+        days_until = (deadline - now).days
+
+        if days_until < 0:
+            warnings.append("Deadline has passed")
+            return 0.0
+        elif days_until <= 1:
+            warnings.append("Deadline TODAY!")
+            return 0.3
+        elif days_until <= 3:
+            warnings.append(f"Deadline in {days_until} days")
+            return 0.5
+        elif days_until <= 7:
+            warnings.append(f"Deadline in {days_until} days")
+            return 0.7
+        elif days_until <= 14:
+            return 0.9
+        else:
+            return 1.0
+
+    def _calculate_track_record_boost(
+        self,
+        profile: Profile,
+        opportunity: Opportunity,
+        tips: List[str],
+    ) -> float:
+        """Calculate boost based on track record."""
+        boost = 0.0
+
+        # Hackathon wins boost for hackathons
+        if opportunity.opportunity_type == "hackathon" and profile.previous_hackathon_wins > 0:
+            boost += min(0.3, profile.previous_hackathon_wins * 0.1)
+            if profile.previous_hackathon_wins >= 3:
+                tips.append("Your hackathon experience gives you an edge!")
+
+        # Previous accelerator experience boost
+        if opportunity.opportunity_type == "accelerator" and profile.previous_accelerators:
+            boost += 0.2
+            tips.append("Your accelerator experience is valuable here")
+
+        # Notable achievements boost
+        if profile.notable_achievements:
+            boost += min(0.2, len(profile.notable_achievements) * 0.05)
+
+        return min(1.0, boost)
+
+    def _generate_primary_reason(
+        self,
+        breakdown: MatchScoreBreakdown,
+        match_reasons: List[str],
+    ) -> str:
+        """Generate the primary match explanation."""
+        if not breakdown.is_eligible:
+            return "Not eligible based on requirements"
+
+        if breakdown.total_score >= 0.8:
+            if breakdown.tech_overlap_score > 0.6:
+                return "Excellent tech stack match for your skills"
+            elif breakdown.semantic_score > 0.7:
+                return "Strong overall alignment with your profile"
+            else:
+                return "Great opportunity based on your goals"
+        elif breakdown.total_score >= 0.6:
+            if match_reasons:
+                return match_reasons[0]
+            return "Good match for your profile"
+        elif breakdown.total_score >= 0.4:
+            return "Moderate match - worth exploring"
+        else:
+            return "Partial match - some alignment with your profile"
 
     def _cosine_similarity(
         self,
@@ -296,7 +533,9 @@ class MongoMatchingService:
                 existing.overall_score = result.score
                 existing.semantic_score = result.breakdown.semantic_score
                 existing.score_breakdown = result.breakdown.to_dict()
-                existing.fix_suggestions = result.suggestions
+                existing.eligibility_status = "eligible" if result.breakdown.is_eligible else "ineligible"
+                existing.eligibility_issues = result.eligibility_issues
+                existing.fix_suggestions = result.suggestions + result.explanation.tips
                 existing.updated_at = datetime.utcnow()
                 await existing.save()
             else:
@@ -307,9 +546,9 @@ class MongoMatchingService:
                     overall_score=result.score,
                     semantic_score=result.breakdown.semantic_score,
                     score_breakdown=result.breakdown.to_dict(),
-                    eligibility_status="eligible" if not result.eligibility_issues else "partial",
+                    eligibility_status="eligible" if result.breakdown.is_eligible else "ineligible",
                     eligibility_issues=result.eligibility_issues,
-                    fix_suggestions=result.suggestions,
+                    fix_suggestions=result.suggestions + result.explanation.tips,
                 )
                 await match.insert()
                 count += 1
@@ -354,6 +593,7 @@ class MongoMatchingService:
                 "is_bookmarked": match.is_bookmarked,
                 "is_dismissed": match.is_dismissed,
                 "eligibility_status": match.eligibility_status,
+                "eligibility_issues": match.eligibility_issues,
                 "suggestions": match.fix_suggestions,
                 "created_at": match.created_at.isoformat() if match.created_at else None,
                 "opportunity": {
@@ -364,6 +604,8 @@ class MongoMatchingService:
                     "website_url": opp.website_url if opp else None,
                     "themes": opp.themes if opp else [],
                     "technologies": opp.technologies if opp else [],
+                    "total_prize_value": opp.total_prize_value if opp else None,
+                    "format": opp.format if opp else None,
                 } if opp else None,
             })
 
@@ -400,6 +642,49 @@ class MongoMatchingService:
             await match.save()
             return True
         return False
+
+    async def record_feedback(
+        self,
+        user_id: str,
+        opportunity_id: str,
+        action: str,
+    ) -> bool:
+        """
+        Record user feedback for match learning.
+
+        Args:
+            user_id: User ID
+            opportunity_id: Opportunity ID
+            action: One of 'bookmark', 'pipeline', 'apply', 'dismiss', 'view'
+
+        Returns:
+            True if feedback was recorded
+        """
+        from beanie import PydanticObjectId
+
+        match = await Match.find_one(
+            Match.user_id == PydanticObjectId(user_id),
+            Match.opportunity_id == PydanticObjectId(opportunity_id),
+        )
+
+        if not match:
+            return False
+
+        # Update match based on action
+        if action == "bookmark":
+            match.is_bookmarked = True
+        elif action == "dismiss":
+            match.is_dismissed = True
+        elif action == "apply":
+            match.is_bookmarked = True  # Auto-bookmark when applied
+
+        match.updated_at = datetime.utcnow()
+        await match.save()
+
+        # In future: use feedback to adjust scoring for similar opportunities
+        logger.info(f"Recorded feedback: user={user_id}, opp={opportunity_id}, action={action}")
+
+        return True
 
 
 # Singleton instance

@@ -222,6 +222,16 @@ class ScraperScheduler:
             replace_existing=True,
         )
 
+        # Deadline reminder check - runs every 6 hours
+        self.scheduler.add_job(
+            self._run_deadline_check,
+            IntervalTrigger(hours=6),
+            id="deadline_check",
+            name="Deadline Reminder Check",
+            replace_existing=True,
+        )
+        logger.info("Scheduled deadline reminder check every 6 hours")
+
     async def _run_devpost_scrape(self):
         """Execute Devpost scraping job."""
         logger.info("Starting scheduled Devpost scrape...")
@@ -229,7 +239,11 @@ class ScraperScheduler:
             result = await self.manager.run_scraper("devpost")
             if result.success:
                 logger.info(f"Devpost scrape completed: {result.total_found} opportunities")
-                # TODO: Call service to persist to database
+                # Persist to database
+                from ..services.scraper_persistence_service import get_scraper_persistence_service
+                service = get_scraper_persistence_service()
+                stats = await service.persist_scraper_result(result)
+                logger.info(f"Devpost persistence: {stats['inserted']} inserted, {stats['updated']} updated")
             else:
                 logger.error(f"Devpost scrape failed: {result.error_message}")
         except Exception as e:
@@ -242,7 +256,11 @@ class ScraperScheduler:
             result = await self.manager.run_scraper("mlh")
             if result.success:
                 logger.info(f"MLH scrape completed: {result.total_found} opportunities")
-                # TODO: Call service to persist to database
+                # Persist to database
+                from ..services.scraper_persistence_service import get_scraper_persistence_service
+                service = get_scraper_persistence_service()
+                stats = await service.persist_scraper_result(result)
+                logger.info(f"MLH persistence: {stats['inserted']} inserted, {stats['updated']} updated")
             else:
                 logger.error(f"MLH scrape failed: {result.error_message}")
         except Exception as e:
@@ -260,6 +278,20 @@ class ScraperScheduler:
                     logger.info(f"Scraper {name} health: {'OK' if is_healthy else 'FAILED'}")
                 finally:
                     await scraper.close()
+
+    async def _run_deadline_check(self):
+        """Check for upcoming deadlines and send reminders."""
+        logger.info("Running deadline reminder check...")
+        try:
+            from ..services.notification_service import get_notification_service
+            service = get_notification_service()
+            stats = await service.check_deadline_reminders()
+            logger.info(
+                f"Deadline check complete: {stats['reminders_sent']} reminders sent, "
+                f"{stats['users_checked']} users checked"
+            )
+        except Exception as e:
+            logger.error(f"Deadline check failed: {e}")
 
     def start(self):
         """Start the scheduler."""

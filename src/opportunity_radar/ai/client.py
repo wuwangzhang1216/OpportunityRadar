@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any, AsyncIterator
 
-from openai import OpenAI, AsyncOpenAI
+from openai import OpenAI
 
 from ..config import get_settings
 
@@ -38,15 +38,15 @@ class BaseLLMClient(ABC):
 
 
 class OpenAIClient(BaseLLMClient):
-    """OpenAI GPT client implementation."""
+    """OpenAI GPT client implementation using the new responses API."""
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-5.2",
     ):
         settings = get_settings()
-        self.client = AsyncOpenAI(api_key=api_key or settings.openai_api_key)
+        self.client = OpenAI(api_key=api_key or settings.openai_api_key)
         self.model = model
 
     async def generate(
@@ -56,22 +56,18 @@ class OpenAIClient(BaseLLMClient):
         max_tokens: int = 2000,
         temperature: float = 0.7,
     ) -> str:
-        """Generate completion using OpenAI."""
-        messages: List[Dict[str, str]] = []
-
+        """Generate completion using OpenAI responses API."""
+        # Combine system prompt with user prompt for the new API
+        full_input = prompt
         if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-
-        messages.append({"role": "user", "content": prompt})
+            full_input = f"{system_prompt}\n\n{prompt}"
 
         try:
-            response = await self.client.chat.completions.create(
+            response = self.client.responses.create(
                 model=self.model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
+                input=full_input,
             )
-            return response.choices[0].message.content or ""
+            return response.output_text or ""
         except Exception as e:
             logger.error(f"OpenAI generation failed: {e}")
             raise
@@ -83,26 +79,22 @@ class OpenAIClient(BaseLLMClient):
         max_tokens: int = 2000,
         temperature: float = 0.7,
     ) -> AsyncIterator[str]:
-        """Generate completion with streaming using OpenAI."""
-        messages: List[Dict[str, str]] = []
-
+        """Generate completion with streaming using OpenAI responses API."""
+        # Combine system prompt with user prompt for the new API
+        full_input = prompt
         if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-
-        messages.append({"role": "user", "content": prompt})
+            full_input = f"{system_prompt}\n\n{prompt}"
 
         try:
-            stream = await self.client.chat.completions.create(
+            response = self.client.responses.create(
                 model=self.model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
+                input=full_input,
                 stream=True,
             )
 
-            async for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+            for chunk in response:
+                if hasattr(chunk, 'output_text') and chunk.output_text:
+                    yield chunk.output_text
         except Exception as e:
             logger.error(f"OpenAI streaming failed: {e}")
             raise
