@@ -1,76 +1,125 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, Target, Calendar, DollarSign, Users } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Search,
+  Target,
+  Calendar,
+  DollarSign,
+  Users,
+  Bookmark,
+  BookmarkCheck,
+  X,
+  Plus,
+  Sparkles,
+  Star,
+  Filter,
+  SlidersHorizontal,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/services/api-client";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate, formatCurrency, formatRelativeTime } from "@/lib/utils";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const categories = [
-  { value: "", label: "All Categories" },
+  { value: "", label: "All" },
   { value: "hackathon", label: "Hackathons" },
   { value: "grant", label: "Grants" },
-  { value: "bounty", label: "Bug Bounties" },
+  { value: "bounty", label: "Bounties" },
   { value: "accelerator", label: "Accelerators" },
   { value: "competition", label: "Competitions" },
+];
+
+const filterOptions = [
+  { value: "all", label: "All Matches" },
+  { value: "bookmarked", label: "Bookmarked" },
+  { value: "dismissed", label: "Dismissed" },
 ];
 
 export default function OpportunitiesPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(0);
   const limit = 20;
+  const queryClient = useQueryClient();
 
+  // Use matches API for personalized results
   const { data, isLoading } = useQuery({
-    queryKey: ["opportunities", search, category, page],
+    queryKey: ["matches", filter, page],
     queryFn: () =>
-      apiClient.getOpportunities({
-        search: search || undefined,
-        category: category || undefined,
+      apiClient.getMatches({
         skip: page * limit,
         limit,
+        bookmarked: filter === "bookmarked" ? true : undefined,
+        dismissed: filter === "dismissed" ? true : filter === "all" ? false : undefined,
       }),
   });
+
+  // Filter by search and category on client side (matches API doesn't support these)
+  const filteredItems = data?.items?.filter((match: any) => {
+    const matchesSearch = !search ||
+      match.opportunity_title?.toLowerCase().includes(search.toLowerCase()) ||
+      match.opportunity_description?.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = !category ||
+      match.opportunity_category === category ||
+      match.opportunity_type === category;
+    return matchesSearch && matchesCategory;
+  }) || [];
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Opportunities</h1>
-        <p className="text-muted-foreground mt-1">
-          Discover hackathons, grants, and funding opportunities
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Opportunities</h1>
+          <p className="text-muted-foreground mt-1">
+            Discover hackathons, grants, and funding opportunities matched to your profile
+          </p>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search opportunities..."
-            className="pl-10"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(0);
-            }}
-          />
+      <div className="space-y-4">
+        <div className="flex gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search opportunities..."
+              className="pl-10"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            {filterOptions.map((opt) => (
+              <Button
+                key={opt.value}
+                variant={filter === opt.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setFilter(opt.value);
+                  setPage(0);
+                }}
+              >
+                {opt.value === "bookmarked" && <Bookmark className="h-3 w-3 mr-1" />}
+                {opt.label}
+              </Button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {categories.map((cat) => (
             <Button
               key={cat.value}
-              variant={category === cat.value ? "default" : "outline"}
+              variant={category === cat.value ? "secondary" : "ghost"}
               size="sm"
-              onClick={() => {
-                setCategory(cat.value);
-                setPage(0);
-              }}
+              onClick={() => setCategory(cat.value)}
             >
               {cat.label}
             </Button>
@@ -91,19 +140,21 @@ export default function OpportunitiesPage() {
             </Card>
           ))}
         </div>
-      ) : data?.items?.length > 0 ? (
+      ) : filteredItems.length > 0 ? (
         <>
           <div className="text-sm text-muted-foreground">
-            Showing {data.items.length} of {data.total} opportunities
+            Showing {filteredItems.length} opportunities
+            {filter === "bookmarked" && " (bookmarked)"}
+            {filter === "dismissed" && " (dismissed)"}
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {data.items.map((opp: any) => (
-              <OpportunityCard key={opp.id || opp._id} opportunity={opp} />
+            {filteredItems.map((match: any) => (
+              <MatchCard key={match.id || match._id} match={match} />
             ))}
           </div>
 
           {/* Pagination */}
-          {data.total > limit && (
+          {data?.total > limit && (
             <div className="flex justify-center gap-2">
               <Button
                 variant="outline"
@@ -129,18 +180,40 @@ export default function OpportunitiesPage() {
         <div className="text-center py-12">
           <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium text-foreground">
-            No opportunities found
+            {filter === "bookmarked"
+              ? "No bookmarked opportunities"
+              : filter === "dismissed"
+              ? "No dismissed opportunities"
+              : "No opportunities found"}
           </h3>
           <p className="text-muted-foreground mt-1">
-            Try adjusting your search or filters
+            {filter === "bookmarked"
+              ? "Bookmark opportunities you're interested in to see them here"
+              : filter === "dismissed"
+              ? "Dismissed opportunities will appear here"
+              : "Try adjusting your search or filters"}
           </p>
+          {filter !== "all" && (
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => setFilter("all")}
+            >
+              View all opportunities
+            </Button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function OpportunityCard({ opportunity }: { opportunity: any }) {
+function MatchCard({ match }: { match: any }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const matchId = match.id || match._id;
+  const batchId = match.batch_id;
+
   const categoryColors: Record<string, string> = {
     hackathon: "bg-sky-100 text-sky-800",
     grant: "bg-green-100 text-green-800",
@@ -149,77 +222,203 @@ function OpportunityCard({ opportunity }: { opportunity: any }) {
     competition: "bg-pink-100 text-pink-800",
   };
 
-  // MongoDB returns _id, Beanie may serialize it as id or _id
-  const opportunityId = opportunity.id || opportunity._id;
-  // Backend uses opportunity_type, frontend may expect category
-  const category = opportunity.category || opportunity.opportunity_type || "hackathon";
+  const category = match.opportunity_category || match.opportunity_type || "hackathon";
+  const scorePercent = Math.round((match.overall_score || match.score || 0) * 100);
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "bg-green-500";
+    if (score >= 60) return "bg-primary";
+    if (score >= 40) return "bg-yellow-500";
+    return "bg-gray-400";
+  };
+
+  const bookmarkMutation = useMutation({
+    mutationFn: () => {
+      if (match.is_bookmarked) {
+        return apiClient.unbookmarkMatch(matchId);
+      }
+      return apiClient.bookmarkMatch(matchId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["topMatches"] });
+    },
+  });
+
+  const dismissMutation = useMutation({
+    mutationFn: () => {
+      if (match.is_dismissed) {
+        return apiClient.restoreMatch(matchId);
+      }
+      return apiClient.dismissMatch(matchId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["topMatches"] });
+    },
+  });
+
+  const addToPipelineMutation = useMutation({
+    mutationFn: () => apiClient.addToPipeline(batchId, "discovered"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pipelineStats"] });
+      router.push("/pipeline");
+    },
+  });
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on action buttons
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    router.push(`/opportunities/${batchId}`);
+  };
 
   return (
-    <Link href={`/opportunities/${opportunityId}`}>
-      <Card className="h-full hover:shadow-md transition cursor-pointer border-border">
-        <CardContent className="pt-6">
-          <div className="flex items-start justify-between mb-3">
-            <Badge
-              className={
-                categoryColors[category] || "bg-secondary text-secondary-foreground"
-              }
-            >
-              {category}
-            </Badge>
-            {opportunity.match_score && (
-              <div className="text-sm font-medium text-primary">
-                {Math.round(opportunity.match_score * 100)}% match
-              </div>
+    <Card
+      className="h-full hover:shadow-md transition cursor-pointer border-border group relative"
+      onClick={handleCardClick}
+    >
+      <CardContent className="pt-6">
+        {/* Quick action buttons - visible on hover */}
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            size="icon"
+            variant="ghost"
+            className={`h-8 w-8 ${match.is_bookmarked ? "text-yellow-600" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              bookmarkMutation.mutate();
+            }}
+            disabled={bookmarkMutation.isPending}
+            title={match.is_bookmarked ? "Remove bookmark" : "Bookmark"}
+          >
+            {match.is_bookmarked ? (
+              <BookmarkCheck className="h-4 w-4" />
+            ) : (
+              <Bookmark className="h-4 w-4" />
             )}
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className={`h-8 w-8 ${match.is_dismissed ? "text-gray-400" : "hover:text-red-600"}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              dismissMutation.mutate();
+            }}
+            disabled={dismissMutation.isPending}
+            title={match.is_dismissed ? "Restore" : "Dismiss"}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 hover:text-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              addToPipelineMutation.mutate();
+            }}
+            disabled={addToPipelineMutation.isPending}
+            title="Add to Pipeline"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="flex items-start justify-between mb-3">
+          <Badge
+            className={
+              categoryColors[category] || "bg-secondary text-secondary-foreground"
+            }
+          >
+            {category}
+          </Badge>
+          {/* Match Score */}
+          <div
+            className={`flex items-center gap-1 px-2 py-1 rounded-full text-white text-sm font-medium ${getScoreColor(scorePercent)}`}
+          >
+            <Star className="h-3 w-3 fill-current" />
+            {scorePercent}%
           </div>
+        </div>
 
-          <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-foreground">
-            {opportunity.title}
-          </h3>
+        <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-foreground group-hover:text-primary transition-colors">
+          {match.opportunity_title}
+        </h3>
 
-          {opportunity.description && (
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-              {opportunity.description}
-            </p>
-          )}
+        {match.opportunity_description && (
+          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+            {match.opportunity_description}
+          </p>
+        )}
 
-          <div className="space-y-2 text-sm text-muted-foreground">
-            {opportunity.deadline && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>Deadline: {formatDate(opportunity.deadline)}</span>
-              </div>
-            )}
-            {opportunity.prize_pool && (
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                <span>Prize: {formatCurrency(opportunity.prize_pool)}</span>
-              </div>
-            )}
-            {opportunity.team_size && (
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <span>Team size: {opportunity.team_size}</span>
-              </div>
-            )}
-          </div>
-
-          {opportunity.tags?.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-4">
-              {opportunity.tags.slice(0, 3).map((tag: string) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {opportunity.tags.length > 3 && (
-                <Badge variant="secondary" className="text-xs">
-                  +{opportunity.tags.length - 3}
-                </Badge>
-              )}
+        <div className="space-y-2 text-sm text-muted-foreground">
+          {match.deadline && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span>{formatRelativeTime(match.deadline)}</span>
             </div>
           )}
-        </CardContent>
-      </Card>
-    </Link>
+          {match.opportunity_prize_pool && (
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              <span>{formatCurrency(match.opportunity_prize_pool)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Match reasons */}
+        {match.reasons && match.reasons.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-4">
+            {match.reasons.slice(0, 2).map((reason: string, i: number) => (
+              <Badge key={i} variant="secondary" className="text-xs">
+                {reason}
+              </Badge>
+            ))}
+            {match.reasons.length > 2 && (
+              <Badge variant="secondary" className="text-xs">
+                +{match.reasons.length - 2}
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {/* Eligibility indicator */}
+        {match.eligibility_status && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <div className={`text-xs font-medium ${
+              match.eligibility_status === "eligible"
+                ? "text-green-600"
+                : match.eligibility_status === "partial"
+                ? "text-yellow-600"
+                : "text-red-600"
+            }`}>
+              {match.eligibility_status === "eligible"
+                ? "✓ Eligible"
+                : match.eligibility_status === "partial"
+                ? "⚠ Partially eligible"
+                : "✗ Check eligibility"}
+            </div>
+          </div>
+        )}
+
+        {/* Status indicators */}
+        <div className="flex gap-2 mt-3">
+          {match.is_bookmarked && (
+            <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-300">
+              <Bookmark className="h-3 w-3 mr-1" />
+              Saved
+            </Badge>
+          )}
+          {match.is_dismissed && (
+            <Badge variant="outline" className="text-xs text-gray-500">
+              Dismissed
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

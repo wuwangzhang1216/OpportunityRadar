@@ -61,6 +61,30 @@ async def get_top_matches(
     return {"items": matches, "count": len(matches)}
 
 
+@router.get("/by-batch/{batch_id}")
+async def get_match_by_batch(
+    batch_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get match for a specific opportunity/batch by batch_id.
+
+    Returns the match record including score breakdown and eligibility info.
+    """
+    try:
+        match = await Match.find_one(
+            Match.user_id == current_user.id,
+            Match.batch_id == PydanticObjectId(batch_id),
+        )
+    except Exception:
+        match = None
+
+    if not match:
+        return None
+
+    return match
+
+
 @router.get("/stats")
 async def get_match_stats(
     current_user: User = Depends(get_current_user),

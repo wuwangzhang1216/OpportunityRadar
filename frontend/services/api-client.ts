@@ -110,18 +110,38 @@ class ApiClient {
     return response.data;
   }
 
-  async getMatches(params?: { status?: string; skip?: number; limit?: number }) {
+  async getMatches(params?: { status?: string; skip?: number; limit?: number; bookmarked?: boolean; dismissed?: boolean }) {
     const response = await this.client.get("/matches", { params });
     return response.data;
   }
 
-  async dismissMatch(batchId: string) {
-    const response = await this.client.post(`/matches/${batchId}/dismiss`);
+  async getMatchByBatch(batchId: string) {
+    const response = await this.client.get(`/matches/by-batch/${batchId}`);
     return response.data;
   }
 
-  async markInterested(batchId: string) {
-    const response = await this.client.post(`/matches/${batchId}/interested`);
+  async getMatchStats() {
+    const response = await this.client.get("/matches/stats");
+    return response.data;
+  }
+
+  async dismissMatch(matchId: string) {
+    const response = await this.client.post(`/matches/${matchId}/dismiss`);
+    return response.data;
+  }
+
+  async restoreMatch(matchId: string) {
+    const response = await this.client.post(`/matches/${matchId}/restore`);
+    return response.data;
+  }
+
+  async bookmarkMatch(matchId: string) {
+    const response = await this.client.post(`/matches/${matchId}/bookmark`);
+    return response.data;
+  }
+
+  async unbookmarkMatch(matchId: string) {
+    const response = await this.client.post(`/matches/${matchId}/unbookmark`);
     return response.data;
   }
 
@@ -156,6 +176,11 @@ class ApiClient {
     return response.data;
   }
 
+  async deletePipeline(pipelineId: string) {
+    const response = await this.client.delete(`/pipelines/${pipelineId}`);
+    return response.data;
+  }
+
   // Materials
   async generateMaterials(data: {
     opportunity_id?: string;
@@ -178,6 +203,11 @@ class ApiClient {
 
   async getMaterial(materialId: string) {
     const response = await this.client.get(`/materials/${materialId}`);
+    return response.data;
+  }
+
+  async deleteMaterial(materialId: string) {
+    const response = await this.client.delete(`/materials/${materialId}`);
     return response.data;
   }
 

@@ -14,12 +14,19 @@ import {
   Plus,
   Sparkles,
   Download,
-  Share2,
+  Target,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  TrendingUp,
+  Bookmark,
+  BookmarkCheck,
+  X,
+  Lightbulb,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dropdown } from "@/components/ui/dropdown";
 import { apiClient } from "@/services/api-client";
 import { formatDate, formatCurrency } from "@/lib/utils";
 
@@ -35,11 +42,40 @@ export default function OpportunityDetailPage() {
     queryFn: () => apiClient.getOpportunity(id),
   });
 
+  // Fetch match data for this opportunity
+  const { data: matchData } = useQuery({
+    queryKey: ["match", id],
+    queryFn: () => apiClient.getMatchByBatch(id),
+    enabled: !!id,
+  });
+
   const addToPipeline = useMutation({
     mutationFn: () => apiClient.addToPipeline(id, "discovered"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pipelineStats"] });
       router.push("/pipeline");
+    },
+  });
+
+  const bookmarkMutation = useMutation({
+    mutationFn: () => {
+      if (matchData?.is_bookmarked) {
+        return apiClient.unbookmarkMatch(matchData.id || matchData._id);
+      }
+      return apiClient.bookmarkMatch(matchData.id || matchData._id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["match", id] });
+      queryClient.invalidateQueries({ queryKey: ["topMatches"] });
+    },
+  });
+
+  const dismissMutation = useMutation({
+    mutationFn: () => apiClient.dismissMatch(matchData.id || matchData._id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["match", id] });
+      queryClient.invalidateQueries({ queryKey: ["topMatches"] });
+      router.push("/opportunities");
     },
   });
 
@@ -82,6 +118,14 @@ export default function OpportunityDetailPage() {
     );
   }
 
+  const scorePercent = matchData ? Math.round((matchData.overall_score || 0) * 100) : null;
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "text-green-600 bg-green-100";
+    if (score >= 60) return "text-blue-600 bg-blue-100";
+    if (score >= 40) return "text-yellow-600 bg-yellow-100";
+    return "text-gray-600 bg-gray-100";
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Back button */}
@@ -118,6 +162,32 @@ export default function OpportunityDetailPage() {
           )}
         </div>
         <div className="flex gap-2">
+          {matchData && (
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => bookmarkMutation.mutate()}
+                disabled={bookmarkMutation.isPending}
+                className={matchData.is_bookmarked ? "text-yellow-600 border-yellow-300" : ""}
+              >
+                {matchData.is_bookmarked ? (
+                  <BookmarkCheck className="h-4 w-4" />
+                ) : (
+                  <Bookmark className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => dismissMutation.mutate()}
+                disabled={dismissMutation.isPending}
+                className="text-gray-500 hover:text-red-600 hover:border-red-300"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          )}
           <Button
             onClick={() => addToPipeline.mutate()}
             disabled={addToPipeline.isPending}
@@ -174,6 +244,122 @@ export default function OpportunityDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Match Score Card - NEW */}
+      {matchData && (
+        <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg">Your Match Score</CardTitle>
+              </div>
+              {scorePercent !== null && (
+                <div className={`text-3xl font-bold px-4 py-2 rounded-xl ${getScoreColor(scorePercent)}`}>
+                  {scorePercent}%
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Score Breakdown */}
+            {matchData.score_breakdown && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {matchData.semantic_score !== undefined && (
+                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
+                    <div className="text-sm text-muted-foreground">Relevance</div>
+                    <div className="text-lg font-semibold">{Math.round(matchData.semantic_score * 100)}%</div>
+                  </div>
+                )}
+                {matchData.rule_score !== undefined && (
+                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
+                    <div className="text-sm text-muted-foreground">Eligibility</div>
+                    <div className="text-lg font-semibold">{Math.round(matchData.rule_score * 100)}%</div>
+                  </div>
+                )}
+                {matchData.time_score !== undefined && (
+                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
+                    <div className="text-sm text-muted-foreground">Timeline</div>
+                    <div className="text-lg font-semibold">{Math.round(matchData.time_score * 100)}%</div>
+                  </div>
+                )}
+                {matchData.team_score !== undefined && (
+                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
+                    <div className="text-sm text-muted-foreground">Team Fit</div>
+                    <div className="text-lg font-semibold">{Math.round(matchData.team_score * 100)}%</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Eligibility Status */}
+            {matchData.eligibility_status && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                {matchData.eligibility_status === "eligible" ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-700">You meet all eligibility requirements</span>
+                  </>
+                ) : matchData.eligibility_status === "partial" ? (
+                  <>
+                    <AlertCircle className="h-5 w-5 text-yellow-600" />
+                    <span className="font-medium text-yellow-700">You meet some requirements</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-5 w-5 text-red-600" />
+                    <span className="font-medium text-red-700">Some eligibility issues found</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Eligibility Issues */}
+            {matchData.eligibility_issues && matchData.eligibility_issues.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-gray-700">Eligibility Concerns:</div>
+                <ul className="space-y-1">
+                  {matchData.eligibility_issues.map((issue: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                      <XCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                      {issue}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Fix Suggestions */}
+            {matchData.fix_suggestions && matchData.fix_suggestions.length > 0 && (
+              <div className="space-y-2 p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+                  <Lightbulb className="h-4 w-4" />
+                  How to improve your match:
+                </div>
+                <ul className="space-y-1">
+                  {matchData.fix_suggestions.map((suggestion: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-blue-600">
+                      <TrendingUp className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      {suggestion}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Match Reasons */}
+            {matchData.reasons && matchData.reasons.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {matchData.reasons.map((reason: string, i: number) => (
+                  <Badge key={i} variant="secondary" className="text-xs">
+                    {reason}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Key Info */}
       <div className="grid gap-4 md:grid-cols-4">

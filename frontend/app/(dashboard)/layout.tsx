@@ -20,6 +20,7 @@ import {
   Users,
   Send,
   Globe,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -31,6 +32,7 @@ const navItems = [
   { href: "/opportunities", label: "Opportunities", icon: Search },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/generator", label: "AI Generator", icon: Sparkles },
+  { href: "/materials", label: "My Materials", icon: FileText },
   { href: "/teams", label: "Teams", icon: Users },
   { href: "/community", label: "Community", icon: Globe },
   { href: "/submissions", label: "Submissions", icon: Send },
