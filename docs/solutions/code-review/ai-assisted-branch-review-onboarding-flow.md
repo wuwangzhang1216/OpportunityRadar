@@ -7,6 +7,7 @@ components: [onboarding, matches, profiles]
 severity: P2
 status: resolved
 branch: feat/onboarding-tutorial-flow
+pr: https://github.com/wuwangzhang1216/OpportunityRadar/pull/2
 verified: true
 ---
 
@@ -247,12 +248,19 @@ All existing tests pass. P3 issue #010 notes that new endpoint-specific tests sh
 
 ## Related Documentation
 
-- `todos/001-pending-p2-batch-id-field-missing.md`
-- `todos/002-pending-p2-api-contract-mismatch.md`
-- `todos/003-pending-p2-stale-matches-accumulation.md`
-- `todos/005-pending-p2-ssrf-url-extraction.md`
-- `todos/006-pending-p2-industries-data-loss.md`
+**Pull Request**: [PR #2](https://github.com/wuwangzhang1216/OpportunityRadar/pull/2)
+
+**Issue Tracking**:
+- `todos/001-pending-p2-batch-id-field-missing.md` (resolved)
+- `todos/002-pending-p2-api-contract-mismatch.md` (resolved)
+- `todos/003-pending-p2-stale-matches-accumulation.md` (resolved)
+- `todos/005-pending-p2-ssrf-url-extraction.md` (resolved)
+- `todos/006-pending-p2-industries-data-loss.md` (resolved)
+
+**Related Docs**:
 - `docs/solutions/security-issues/admin-api-security-performance-review.md`
+- `docs/code-reviews/feat-onboarding-tutorial-flow-review.yaml`
+- `plans/feat-user-onboarding-tutorial-flow.md`
 - `CLAUDE.md` (Architecture reference)
 
 ---
