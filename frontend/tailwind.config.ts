@@ -43,6 +43,19 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Urgency colors for deadline visualization
+        urgency: {
+          safe: "hsl(var(--urgency-safe))",
+          warning: "hsl(var(--urgency-warning))",
+          urgent: "hsl(var(--urgency-urgent))",
+          critical: "hsl(var(--urgency-critical))",
+          expired: "hsl(var(--urgency-expired))",
+        },
+        // AI accent colors
+        ai: {
+          start: "hsl(var(--ai-gradient-start))",
+          end: "hsl(var(--ai-gradient-end))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

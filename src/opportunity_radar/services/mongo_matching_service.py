@@ -23,32 +23,24 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MatchScoreBreakdown:
-    """Detailed breakdown of match score with multi-factor scoring."""
+    """Simplified scoring: semantic similarity is the primary signal.
 
-    # Similarity Scores (0-1)
-    semantic_score: float = 0.0  # Semantic embedding similarity
-    tech_overlap_score: float = 0.0  # Tech stack overlap
-    industry_alignment_score: float = 0.0  # Industry/theme alignment
-    goals_alignment_score: float = 0.0  # Goals matching
+    The embedding vectors already encode tech stack, industries, goals, and description.
+    Additional factors only provide minor adjustments for specific signals.
+    """
 
-    # Timing Score (0-1)
-    deadline_score: float = 0.0  # Penalize near deadlines
+    # Primary score: semantic embedding similarity (0-1)
+    # This captures tech, industry, goals, and overall fit in one vector comparison
+    semantic_score: float = 0.0
 
-    # Eligibility (boolean, used for hard filtering)
+    # Secondary signals for specific adjustments
+    recency_boost: float = 0.0      # Boost for recently posted opportunities
+    popularity_boost: float = 0.0   # Boost based on participant count / engagement
+
+    # Eligibility (hard filters)
     team_size_eligible: bool = True
     funding_stage_eligible: bool = True
     location_eligible: bool = True
-
-    # Boost Factors
-    track_record_boost: float = 0.0  # Past success indicators
-
-    # Weights
-    semantic_weight: float = 0.30
-    tech_weight: float = 0.20
-    industry_weight: float = 0.15
-    goals_weight: float = 0.15
-    deadline_weight: float = 0.10
-    track_record_weight: float = 0.10
 
     @property
     def is_eligible(self) -> bool:
@@ -57,51 +49,24 @@ class MatchScoreBreakdown:
 
     @property
     def total_score(self) -> float:
-        """Calculate weighted total score."""
+        """Score is primarily semantic similarity with minor boosts."""
         if not self.is_eligible:
             return 0.0
 
-        base_score = (
-            self.semantic_score * self.semantic_weight
-            + self.tech_overlap_score * self.tech_weight
-            + self.industry_alignment_score * self.industry_weight
-            + self.goals_alignment_score * self.goals_weight
-            + self.deadline_score * self.deadline_weight
-            + self.track_record_boost * self.track_record_weight
-        )
-        return min(1.0, base_score)
+        # Base score is semantic similarity (already 0-1)
+        # Apply minor boosts (max 5% total boost)
+        boost = min(0.05, self.recency_boost + self.popularity_boost)
+
+        return min(1.0, self.semantic_score + boost)
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
         return {
             "total": round(self.total_score, 3),
             "is_eligible": self.is_eligible,
-            "factors": {
-                "semantic": {
-                    "score": round(self.semantic_score, 3),
-                    "weight": self.semantic_weight,
-                },
-                "tech_overlap": {
-                    "score": round(self.tech_overlap_score, 3),
-                    "weight": self.tech_weight,
-                },
-                "industry_alignment": {
-                    "score": round(self.industry_alignment_score, 3),
-                    "weight": self.industry_weight,
-                },
-                "goals_alignment": {
-                    "score": round(self.goals_alignment_score, 3),
-                    "weight": self.goals_weight,
-                },
-                "deadline": {
-                    "score": round(self.deadline_score, 3),
-                    "weight": self.deadline_weight,
-                },
-                "track_record": {
-                    "score": round(self.track_record_boost, 3),
-                    "weight": self.track_record_weight,
-                },
-            },
+            "semantic_score": round(self.semantic_score, 3),
+            "recency_boost": round(self.recency_boost, 3),
+            "popularity_boost": round(self.popularity_boost, 3),
             "eligibility": {
                 "team_size": self.team_size_eligible,
                 "funding_stage": self.funding_stage_eligible,
@@ -143,26 +108,65 @@ class MatchResult:
     suggestions: List[str] = field(default_factory=list)
 
 
-# Goal to opportunity type mapping
-GOAL_TYPE_MAPPING = {
-    "funding": ["grant", "accelerator", "competition"],
-    "prizes": ["hackathon", "competition", "bug-bounty", "bounty"],
-    "learning": ["hackathon", "competition", "bootcamp"],
-    "networking": ["hackathon", "accelerator", "conference"],
-    "exposure": ["hackathon", "competition", "accelerator"],
-    "mentorship": ["accelerator", "bootcamp"],
-    "equity": ["accelerator"],
-    "building": ["hackathon", "buildathon"],
+# Industry/theme aliases for fuzzy matching (used for display only)
+INDUSTRY_ALIASES = {
+    "ai": ["ai/ml", "machine learning/ai", "machine learning", "artificial intelligence", "ml", "deep learning", "llm"],
+    "ml": ["ai/ml", "machine learning/ai", "machine learning", "ml", "ai"],
+    "developer tools": ["devtools", "dev tools", "developer", "tools"],
+    "data visualization": ["data viz", "visualization", "data", "analytics"],
+    "fintech": ["finance", "financial", "banking", "payments"],
+    "healthtech": ["health", "healthcare", "medical", "biotech"],
+    "edtech": ["education", "learning", "e-learning"],
+    "saas": ["software", "cloud", "enterprise"],
+    "productivity": ["productivity", "workflow", "automation"],
+    "web": ["web", "web development", "frontend", "backend"],
 }
 
-# Funding stage to accelerator stage mapping
-FUNDING_STAGE_MAPPING = {
-    "bootstrapped": ["pre-seed", "idea", "early"],
-    "pre_seed": ["pre-seed", "seed", "early"],
-    "seed": ["seed", "early", "growth"],
-    "series_a": ["series-a", "growth", "scaling"],
-    "series_b_plus": ["growth", "scaling", "late"],
-}
+
+def fuzzy_industry_match(profile_industries: set, opp_themes: set) -> tuple[float, list]:
+    """
+    Compute fuzzy industry/theme match score.
+
+    Returns:
+        Tuple of (score, list of matching themes)
+    """
+    if not profile_industries or not opp_themes:
+        return 0.5, []
+
+    matches = set()
+
+    # Direct matches
+    direct_overlap = profile_industries & opp_themes
+    matches.update(direct_overlap)
+
+    # Fuzzy matches using aliases
+    for profile_ind in profile_industries:
+        profile_lower = profile_ind.lower()
+        # Check if profile industry has aliases
+        for alias_key, alias_values in INDUSTRY_ALIASES.items():
+            if profile_lower in alias_values or alias_key in profile_lower:
+                # Check if any opportunity theme matches these aliases
+                for opp_theme in opp_themes:
+                    opp_lower = opp_theme.lower()
+                    if opp_lower in alias_values or alias_key in opp_lower:
+                        matches.add(opp_theme)
+                        break
+
+    # Also do substring matching for partial matches
+    for profile_ind in profile_industries:
+        profile_lower = profile_ind.lower()
+        for opp_theme in opp_themes:
+            opp_lower = opp_theme.lower()
+            # Check if one contains the other (partial match)
+            if profile_lower in opp_lower or opp_lower in profile_lower:
+                matches.add(opp_theme)
+
+    if not matches:
+        return 0.0, []
+
+    # Score based on how many profile industries found matches
+    score = min(1.0, len(matches) / len(profile_industries))
+    return score, list(matches)
 
 
 class MongoMatchingService:
@@ -250,95 +254,65 @@ class MongoMatchingService:
         profile: Profile,
         opportunity: Opportunity,
     ) -> MatchResult:
-        """Compute match score between a profile and opportunity."""
+        """Compute match score using semantic similarity as the primary signal.
+
+        The embedding vectors already encode:
+        - Tech stack (profile.tech_stack vs opportunity.technologies)
+        - Industries/themes (profile.interests vs opportunity.themes)
+        - Goals alignment (profile.goals vs opportunity.opportunity_type)
+        - Overall description fit (profile.bio vs opportunity.description)
+
+        So we rely on cosine similarity between embeddings rather than
+        naive string matching.
+        """
         breakdown = MatchScoreBreakdown()
         match_reasons = []
         eligibility_issues = []
         suggestions = []
-        matching_skills = []
-        matching_themes = []
         warnings = []
         tips = []
 
         # 1. Apply hard filters (eligibility checks)
         self._apply_hard_filters(profile, opportunity, breakdown, eligibility_issues)
 
-        # 2. Semantic similarity (embeddings)
+        # 2. Semantic similarity - THE PRIMARY SCORE
         if profile.embedding and opportunity.embedding:
             breakdown.semantic_score = self._cosine_similarity(
                 profile.embedding, opportunity.embedding
             )
-            if breakdown.semantic_score > 0.75:
-                match_reasons.append("Strong semantic alignment with your profile")
-            elif breakdown.semantic_score > 0.6:
-                match_reasons.append("Good semantic match")
+
+            # Generate match reasons based on score
+            if breakdown.semantic_score >= 0.80:
+                match_reasons.append("Excellent match for your profile")
+            elif breakdown.semantic_score >= 0.75:
+                match_reasons.append("Strong alignment with your skills and interests")
+            elif breakdown.semantic_score >= 0.70:
+                match_reasons.append("Good match based on your profile")
+            elif breakdown.semantic_score >= 0.65:
+                match_reasons.append("Moderate fit - worth exploring")
         else:
-            # Default to neutral if no embeddings
             breakdown.semantic_score = 0.5
             if not opportunity.embedding:
-                suggestions.append("Opportunity lacks embedding - semantic matching unavailable")
+                suggestions.append("Opportunity data incomplete")
 
-        # 3. Tech stack overlap
-        profile_tech = set(t.lower() for t in (profile.tech_stack or []))
-        opp_tech = set(t.lower() for t in (opportunity.technologies or []))
+        # 3. Recency boost - newer opportunities get slight boost
+        if opportunity.created_at:
+            days_old = (datetime.utcnow() - opportunity.created_at).days
+            if days_old <= 7:
+                breakdown.recency_boost = 0.02  # 2% boost for week-old
+            elif days_old <= 14:
+                breakdown.recency_boost = 0.01  # 1% boost for 2 weeks
 
-        if profile_tech and opp_tech:
-            overlap = profile_tech & opp_tech
-            union = profile_tech | opp_tech
-            breakdown.tech_overlap_score = len(overlap) / len(union) if union else 0.0
-            matching_skills = list(overlap)[:5]
+        # 4. Popularity boost - based on participant count if available
+        if opportunity.participant_count and opportunity.participant_count > 100:
+            breakdown.popularity_boost = 0.01  # 1% boost for popular events
 
-            if breakdown.tech_overlap_score > 0.5:
-                match_reasons.append(f"Strong tech stack overlap: {', '.join(matching_skills[:3])}")
-            elif breakdown.tech_overlap_score > 0.2:
-                match_reasons.append("Some tech stack overlap")
-            elif breakdown.tech_overlap_score == 0 and opp_tech:
-                missing = list(opp_tech - profile_tech)[:3]
-                tips.append(f"Consider learning: {', '.join(missing)}")
-        else:
-            breakdown.tech_overlap_score = 0.5  # Neutral if no tech requirements
+        # Generate explanation
+        primary_reason = self._generate_explanation(breakdown, match_reasons)
 
-        # 4. Industry/theme alignment
-        profile_industries = set(i.lower() for i in (profile.interests or []))
-        opp_themes = set(t.lower() for t in (opportunity.themes or []))
-
-        if profile_industries and opp_themes:
-            industry_overlap = profile_industries & opp_themes
-            industry_union = profile_industries | opp_themes
-            breakdown.industry_alignment_score = len(industry_overlap) / len(industry_union) if industry_union else 0.0
-            matching_themes = list(industry_overlap)[:5]
-
-            if breakdown.industry_alignment_score > 0.3:
-                match_reasons.append(f"Industry alignment: {', '.join(matching_themes[:3])}")
-        else:
-            breakdown.industry_alignment_score = 0.5
-
-        # 5. Goals alignment
-        profile_goals = set(g.lower() for g in (profile.goals or []))
-        opp_type = (opportunity.opportunity_type or "").lower()
-
-        if profile_goals and opp_type:
-            matching_goals = 0
-            for goal in profile_goals:
-                matching_types = GOAL_TYPE_MAPPING.get(goal, [])
-                if opp_type in matching_types or any(t in opp_type for t in matching_types):
-                    matching_goals += 1
-
-            breakdown.goals_alignment_score = min(1.0, matching_goals / len(profile_goals)) if profile_goals else 0.5
-
-            if breakdown.goals_alignment_score > 0.5:
-                match_reasons.append("Aligns with your goals")
-        else:
-            breakdown.goals_alignment_score = 0.5
-
-        # 6. Deadline score - encourage applying early
-        breakdown.deadline_score = self._calculate_deadline_score(opportunity, warnings)
-
-        # 7. Track record boost
-        breakdown.track_record_boost = self._calculate_track_record_boost(profile, opportunity, tips)
-
-        # Generate primary explanation
-        primary_reason = self._generate_primary_reason(breakdown, match_reasons)
+        # Extract matching themes/skills for display (informational only, not used in scoring)
+        matching_themes = self._find_matching_themes(profile, opportunity)
+        matching_skills = self._find_matching_skills(profile, opportunity)
 
         explanation = MatchExplanation(
             primary_reason=primary_reason,
@@ -357,6 +331,39 @@ class MongoMatchingService:
             eligibility_issues=eligibility_issues,
             suggestions=suggestions,
         )
+
+    def _find_matching_themes(self, profile: Profile, opportunity: Opportunity) -> List[str]:
+        """Find matching themes for display purposes (not scoring)."""
+        profile_interests = set(i.lower() for i in (profile.interests or []))
+        opp_themes = set(t.lower() for t in (opportunity.themes or []))
+
+        # Use fuzzy matching for display
+        _, matches = fuzzy_industry_match(profile_interests, opp_themes)
+        return matches[:3]
+
+    def _find_matching_skills(self, profile: Profile, opportunity: Opportunity) -> List[str]:
+        """Find matching skills for display purposes (not scoring)."""
+        profile_tech = set(t.lower() for t in (profile.tech_stack or []))
+        opp_tech = set(t.lower() for t in (opportunity.technologies or []))
+        return list(profile_tech & opp_tech)[:3]
+
+    def _generate_explanation(self, breakdown: MatchScoreBreakdown, reasons: List[str]) -> str:
+        """Generate primary explanation based on score."""
+        if not breakdown.is_eligible:
+            return "Not eligible based on requirements"
+
+        if reasons:
+            return reasons[0]
+
+        score = breakdown.total_score
+        if score >= 0.80:
+            return "Excellent match for your profile"
+        elif score >= 0.70:
+            return "Good match based on your interests"
+        elif score >= 0.60:
+            return "Worth exploring"
+        else:
+            return "Some alignment with your profile"
 
     def _apply_hard_filters(
         self,
@@ -387,105 +394,17 @@ class MongoMatchingService:
         # Location check (simplified - would need opportunity location requirements)
         breakdown.location_eligible = True
 
-    def _calculate_deadline_score(
-        self,
-        opportunity: Opportunity,
-        warnings: List[str],
-    ) -> float:
-        """Calculate deadline score - penalize near deadlines."""
-        # Check timelines for deadline
-        deadline = None
-        if opportunity.timelines:
-            for timeline in opportunity.timelines:
-                if isinstance(timeline, dict):
-                    deadline_str = timeline.get("submission_deadline") or timeline.get("registration_closes_at")
-                    if deadline_str:
-                        try:
-                            deadline = datetime.fromisoformat(deadline_str.replace("Z", "+00:00"))
-                        except (ValueError, AttributeError):
-                            pass
-                        break
-
-        if not deadline:
-            return 0.7  # Neutral score if no deadline
-
-        now = datetime.now(deadline.tzinfo) if deadline.tzinfo else datetime.utcnow()
-        days_until = (deadline - now).days
-
-        if days_until < 0:
-            warnings.append("Deadline has passed")
-            return 0.0
-        elif days_until <= 1:
-            warnings.append("Deadline TODAY!")
-            return 0.3
-        elif days_until <= 3:
-            warnings.append(f"Deadline in {days_until} days")
-            return 0.5
-        elif days_until <= 7:
-            warnings.append(f"Deadline in {days_until} days")
-            return 0.7
-        elif days_until <= 14:
-            return 0.9
-        else:
-            return 1.0
-
-    def _calculate_track_record_boost(
-        self,
-        profile: Profile,
-        opportunity: Opportunity,
-        tips: List[str],
-    ) -> float:
-        """Calculate boost based on track record."""
-        boost = 0.0
-
-        # Hackathon wins boost for hackathons
-        if opportunity.opportunity_type == "hackathon" and profile.previous_hackathon_wins > 0:
-            boost += min(0.3, profile.previous_hackathon_wins * 0.1)
-            if profile.previous_hackathon_wins >= 3:
-                tips.append("Your hackathon experience gives you an edge!")
-
-        # Previous accelerator experience boost
-        if opportunity.opportunity_type == "accelerator" and profile.previous_accelerators:
-            boost += 0.2
-            tips.append("Your accelerator experience is valuable here")
-
-        # Notable achievements boost
-        if profile.notable_achievements:
-            boost += min(0.2, len(profile.notable_achievements) * 0.05)
-
-        return min(1.0, boost)
-
-    def _generate_primary_reason(
-        self,
-        breakdown: MatchScoreBreakdown,
-        match_reasons: List[str],
-    ) -> str:
-        """Generate the primary match explanation."""
-        if not breakdown.is_eligible:
-            return "Not eligible based on requirements"
-
-        if breakdown.total_score >= 0.8:
-            if breakdown.tech_overlap_score > 0.6:
-                return "Excellent tech stack match for your skills"
-            elif breakdown.semantic_score > 0.7:
-                return "Strong overall alignment with your profile"
-            else:
-                return "Great opportunity based on your goals"
-        elif breakdown.total_score >= 0.6:
-            if match_reasons:
-                return match_reasons[0]
-            return "Good match for your profile"
-        elif breakdown.total_score >= 0.4:
-            return "Moderate match - worth exploring"
-        else:
-            return "Partial match - some alignment with your profile"
-
     def _cosine_similarity(
         self,
         vec1: List[float],
         vec2: List[float],
     ) -> float:
-        """Calculate cosine similarity between two vectors."""
+        """Calculate cosine similarity between two vectors with score spreading.
+
+        OpenAI embeddings typically produce similarities in 0.3-0.5 range for
+        related content (after normalization). We apply a transformation to
+        spread scores more visually meaningful across the 0-1 range.
+        """
         try:
             a = np.array(vec1)
             b = np.array(vec2)
@@ -497,9 +416,27 @@ class MongoMatchingService:
             if norm_a == 0 or norm_b == 0:
                 return 0.0
 
-            similarity = dot_product / (norm_a * norm_b)
-            # Normalize to 0-1 range (cosine similarity can be -1 to 1)
-            return float((similarity + 1) / 2)
+            # Raw cosine similarity (typically 0.3-0.5 for related embeddings)
+            raw_similarity = dot_product / (norm_a * norm_b)
+
+            # Apply score spreading transformation:
+            # Map typical range [0.25, 0.55] to [0.50, 0.95] for better user perception
+            # This makes scores more meaningful (50% = weak, 70% = good, 90% = excellent)
+            min_raw = 0.25  # Minimum expected similarity for any content
+            max_raw = 0.55  # Maximum typical similarity for highly relevant content
+            min_output = 0.50
+            max_output = 0.95
+
+            if raw_similarity <= min_raw:
+                stretched = raw_similarity / min_raw * min_output
+            elif raw_similarity >= max_raw:
+                stretched = max_output + (raw_similarity - max_raw) * 0.5
+            else:
+                # Linear interpolation in the typical range
+                ratio = (raw_similarity - min_raw) / (max_raw - min_raw)
+                stretched = min_output + ratio * (max_output - min_output)
+
+            return float(max(0.0, min(1.0, stretched)))
         except Exception as e:
             logger.warning(f"Error calculating cosine similarity: {e}")
             return 0.5

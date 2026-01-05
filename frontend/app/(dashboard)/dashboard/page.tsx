@@ -13,6 +13,7 @@ import {
   Sparkles,
   Zap,
   ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/services/api-client";
 import { formatRelativeTime } from "@/lib/utils";
 import { DashboardTour } from "@/components/tours/dashboard-tour";
+import { TodaysFocusCard } from "@/components/dashboard/todays-focus-card";
+import { AIValueCard } from "@/components/dashboard/ai-value-card";
 import type { Match } from "@/types";
 
 const container = {
@@ -53,6 +56,19 @@ export default function DashboardPage() {
     queryFn: () => apiClient.getMatches({ limit: 1 }),
   });
 
+  // Calculate urgency stats for pipeline items with upcoming deadlines
+  const { data: pipelineData } = useQuery({
+    queryKey: ["pipelines"],
+    queryFn: () => apiClient.getPipelines({ limit: 100 }),
+  });
+
+  // Count items with urgent deadlines
+  const urgentDeadlines = (pipelineData?.items || []).filter((item: any) => {
+    if (!item.deadline || item.status === "won" || item.status === "lost") return false;
+    const daysLeft = Math.ceil((new Date(item.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    return daysLeft >= 0 && daysLeft <= 7;
+  }).length;
+
   return (
     <motion.div
       variants={container}
@@ -76,8 +92,13 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
+      {/* AI Assistant Recommendations - Hero Section */}
+      <motion.div variants={item} data-tour="ai-assistant">
+        <TodaysFocusCard />
+      </motion.div>
+
       {/* Stats Grid */}
-      <motion.div variants={item} className="grid gap-4 md:grid-cols-4" data-tour="stats">
+      <motion.div variants={item} className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4" data-tour="stats">
         <StatCard
           title="Total Matches"
           value={matchStats?.total || 0}
@@ -93,6 +114,9 @@ export default function DashboardPage() {
           description="Active opportunities"
           color="green"
           delay={0.1}
+          urgency={urgentDeadlines > 0 ? (urgentDeadlines >= 3 ? "critical" : "warning") : undefined}
+          urgencyLabel={urgentDeadlines > 0 ? `${urgentDeadlines} due this week` : undefined}
+          urgencyCount={urgentDeadlines}
         />
         <StatCard
           title="Preparing"
@@ -265,6 +289,14 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* AI Value Dashboard */}
+      <motion.div variants={item}>
+        <AIValueCard
+          matchesCount={matchStats?.total || 0}
+          pipelineItems={pipelineStats?.total || 0}
+        />
+      </motion.div>
     </motion.div>
   );
 }
@@ -276,6 +308,9 @@ function StatCard({
   description,
   color,
   delay,
+  urgency,
+  urgencyLabel,
+  urgencyCount,
 }: {
   title: string;
   value: number | string;
@@ -283,6 +318,9 @@ function StatCard({
   description: string;
   color: "primary" | "green" | "yellow" | "purple";
   delay: number;
+  urgency?: "warning" | "critical";
+  urgencyLabel?: string;
+  urgencyCount?: number;
 }) {
   const colorClasses = {
     primary: {
@@ -307,7 +345,19 @@ function StatCard({
     },
   };
 
+  const urgencyClasses = {
+    warning: {
+      border: "border-l-4 border-l-urgency-warning",
+      badge: "bg-urgency-warning/10 text-urgency-warning",
+    },
+    critical: {
+      border: "border-l-4 border-l-urgency-critical animate-urgency-pulse",
+      badge: "bg-urgency-critical/10 text-urgency-critical",
+    },
+  };
+
   const colors = colorClasses[color];
+  const urgencyStyles = urgency ? urgencyClasses[urgency] : null;
 
   return (
     <motion.div
@@ -315,29 +365,39 @@ function StatCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      className="h-full"
     >
-      <Card variant="elevated" className="overflow-hidden group cursor-pointer">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <Card variant="elevated" className={`overflow-hidden group cursor-pointer h-full ${urgencyStyles?.border || ""}`}>
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-start sm:items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
+                {urgency && urgencyLabel && (
+                  <span className={`text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${urgencyStyles?.badge}`}>
+                    <AlertTriangle className="inline h-2 sm:h-2.5 w-2 sm:w-2.5 mr-0.5" />
+                    <span className="hidden sm:inline">{urgencyLabel}</span>
+                    <span className="sm:hidden">{urgencyCount}</span>
+                  </span>
+                )}
+              </div>
               <motion.p
-                className="text-3xl font-bold mt-1"
+                className="text-2xl sm:text-3xl font-bold mt-1"
                 initial={{ scale: 0.5 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: delay + 0.2, type: "spring" }}
               >
                 {value}
               </motion.p>
-              <p className="text-xs text-muted-foreground mt-1">{description}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 truncate">{description}</p>
             </div>
             <div
-              className={`relative p-3 rounded-xl ${colors.light} group-hover:scale-110 transition-transform duration-300`}
+              className={`relative p-2 sm:p-3 rounded-lg sm:rounded-xl flex-shrink-0 ${colors.light} group-hover:scale-110 transition-transform duration-300`}
             >
               <div
-                className={`absolute inset-0 ${colors.bg} rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
+                className={`absolute inset-0 ${colors.bg} rounded-lg sm:rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
               />
-              <div className={`relative ${colors.text} group-hover:text-white transition-colors`}>
+              <div className={`relative ${colors.text} group-hover:text-white transition-colors [&>svg]:h-4 [&>svg]:w-4 sm:[&>svg]:h-5 sm:[&>svg]:w-5`}>
                 {icon}
               </div>
             </div>

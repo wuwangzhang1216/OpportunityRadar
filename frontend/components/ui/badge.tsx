@@ -23,6 +23,14 @@ const badgeVariants = cva(
           "border-transparent bg-sky-100 text-sky-700",
         purple:
           "border-transparent bg-purple-100 text-purple-700",
+        // AI-specific variants
+        ai: "border-primary/20 bg-gradient-to-r from-primary/10 to-purple-500/10 text-primary",
+        aiSolid: "border-transparent ai-gradient text-white",
+        // Urgency variants
+        urgencySafe: "border-transparent bg-urgency-safe/10 text-urgency-safe",
+        urgencyWarning: "border-transparent bg-urgency-warning/10 text-urgency-warning",
+        urgencyUrgent: "border-transparent bg-urgency-urgent/10 text-urgency-urgent",
+        urgencyCritical: "border-transparent bg-urgency-critical/10 text-urgency-critical",
       },
       size: {
         default: "px-2.5 py-0.5 text-xs",

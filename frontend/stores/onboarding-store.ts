@@ -130,7 +130,10 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         goals: Array.isArray(extracted?.goals?.value)
           ? extracted.goals.value
           : [],
-        interests: [],
+        // interests should mirror industries for matching
+        interests: Array.isArray(extracted?.industries?.value)
+          ? extracted.industries.value
+          : [],
         experience_level: "intermediate",
         team_size:
           typeof extracted?.team_size?.value === "number"

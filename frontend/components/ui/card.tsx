@@ -13,6 +13,15 @@ const cardVariants = cva(
         outline: "bg-transparent border border-border hover:border-primary/50",
         glow: "bg-card border border-border hover:glow-sm",
         feature: "bg-secondary/50 border border-border",
+        // AI-specific variants
+        ai: "bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/20 hover:border-primary/40 hover:shadow-md",
+        aiGlow: "bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/20 hover:glow-md ai-shimmer",
+        aiSolid: "ai-gradient text-white border-transparent",
+        // Urgency variants for deadline cards
+        urgencySafe: "bg-card border-l-4 border-l-urgency-safe border-t border-r border-b border-border",
+        urgencyWarning: "bg-urgency-warning/5 border-l-4 border-l-urgency-warning border-t border-r border-b border-border",
+        urgencyUrgent: "bg-urgency-urgent/5 border-l-4 border-l-urgency-urgent border-t border-r border-b border-border",
+        urgencyCritical: "bg-urgency-critical/5 border-l-4 border-l-urgency-critical border-t border-r border-b border-border animate-urgency-pulse",
       },
     },
     defaultVariants: {
