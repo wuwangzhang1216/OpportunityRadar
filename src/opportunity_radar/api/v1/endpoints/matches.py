@@ -199,13 +199,21 @@ async def get_match_status(
     has_profile = profile is not None
     has_embedding = profile and profile.embedding is not None
 
-    # Determine status
-    if total_count > 0:
-        status_value = "ready"
-    elif has_embedding:
-        status_value = "calculating"
-    else:
+    # Determine status - detect in-progress recalculation
+    if not has_profile:
         status_value = "no_profile"
+    elif not has_embedding:
+        status_value = "no_profile"
+    elif profile.last_match_computation is None:
+        # Never computed yet
+        status_value = "calculating"
+    elif profile.updated_at > profile.last_match_computation:
+        # Profile updated since last computation - recalculating
+        status_value = "calculating"
+    elif total_count > 0:
+        status_value = "ready"
+    else:
+        status_value = "calculating"
 
     return {
         "has_profile": has_profile,

@@ -1,7 +1,7 @@
 # 008: Polling Errors Silently Ignored
 
 ## Metadata
-- **Status**: pending
+- **Status**: resolved
 - **Priority**: P3 (Nice-to-have)
 - **Issue ID**: 008
 - **Tags**: code-review, error-handling, ux

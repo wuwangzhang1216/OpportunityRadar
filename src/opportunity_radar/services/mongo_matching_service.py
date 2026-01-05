@@ -5,6 +5,7 @@ utilizing OpenAI embeddings for semantic similarity scoring with multi-factor sc
 hard filters, and human-readable explanations.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -223,9 +224,13 @@ class MongoMatchingService:
             logger.info("No opportunities found for matching")
             return []
 
-        # Compute matches
+        # Compute matches with yield points to prevent event loop blocking
         matches = []
-        for opp in opportunities:
+        for i, opp in enumerate(opportunities):
+            # Yield every 50 opportunities to allow other async tasks to run
+            if i > 0 and i % 50 == 0:
+                await asyncio.sleep(0)
+
             result = self._compute_single_match(profile, opp)
 
             # Apply hard filters
@@ -576,6 +581,12 @@ class MongoMatchingService:
                 )
                 await match.insert()
                 count += 1
+
+        # Update profile's last_match_computation timestamp
+        profile = await Profile.find_one(Profile.user_id == user_oid)
+        if profile:
+            profile.last_match_computation = datetime.utcnow()
+            await profile.save()
 
         return count
 

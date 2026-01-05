@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/services/api-client";
 import { formatRelativeTime } from "@/lib/utils";
 import { DashboardTour } from "@/components/tours/dashboard-tour";
+import type { Match } from "@/types";
 
 const container = {
   hidden: { opacity: 0 },
@@ -142,7 +143,7 @@ export default function DashboardPage() {
                 </div>
               ) : matches?.items?.length > 0 ? (
                 <div className="space-y-3">
-                  {matches.items.slice(0, 5).map((match: any, index: number) => (
+                  {matches.items.slice(0, 5).map((match: Match, index: number) => (
                     <motion.div
                       key={match.batch_id}
                       initial={{ opacity: 0, x: -20 }}
@@ -347,8 +348,8 @@ function StatCard({
   );
 }
 
-function MatchCard({ match }: { match: any }) {
-  const scorePercent = Math.round((match.score || 0) * 100);
+function MatchCard({ match }: { match: Match }) {
+  const scorePercent = Math.round((match.score || match.overall_score || 0) * 100);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "bg-green-500";

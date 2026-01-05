@@ -1,7 +1,7 @@
 # 007: Match Status Doesn't Detect In-Progress Recalculation
 
 ## Metadata
-- **Status**: pending
+- **Status**: resolved
 - **Priority**: P3 (Nice-to-have)
 - **Issue ID**: 007
 - **Tags**: code-review, ux, improvement

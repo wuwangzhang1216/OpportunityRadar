@@ -1,7 +1,7 @@
 # 009: Untyped Match Data (any type)
 
 ## Metadata
-- **Status**: pending
+- **Status**: resolved
 - **Priority**: P3 (Nice-to-have)
 - **Issue ID**: 009
 - **Tags**: code-review, typescript, type-safety

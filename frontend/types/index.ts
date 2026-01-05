@@ -194,14 +194,33 @@ export interface Prize {
 
 export interface Match {
   id: string;
-  profile_id: string;
-  batch_id: string;
-  score: number;
-  reasons: string[];
-  status: string;
+  _id?: string;
+  user_id: string;
+  opportunity_id: string;
+  batch_id?: string;  // Alias for opportunity_id (frontend compatibility)
+  // Scores
+  overall_score: number;
+  score?: number;  // Alias for overall_score
+  semantic_score?: number;
+  score_breakdown?: Record<string, number>;
+  // Eligibility
+  eligibility_status?: "eligible" | "ineligible";
+  eligibility_issues?: string[];
+  fix_suggestions?: string[];
+  reasons?: string[];  // Legacy alias
+  // User actions
+  is_bookmarked: boolean;
+  is_dismissed: boolean;
+  // Enriched opportunity data
   opportunity_title?: string;
   opportunity_category?: string;
+  opportunity_description?: string;
+  opportunity_url?: string;
+  opportunity_prize_pool?: number;
   deadline?: string;
+  // Timestamps
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Pipeline {

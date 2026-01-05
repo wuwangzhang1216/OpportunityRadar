@@ -77,6 +77,7 @@ class Profile(Document):
     embedding: Optional[List[float]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    last_match_computation: Optional[datetime] = None  # Track when matches were last computed
 
     class Settings:
         name = "profiles"

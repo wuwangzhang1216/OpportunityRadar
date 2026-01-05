@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/services/api-client";
 import { formatDate, formatCurrency, formatRelativeTime } from "@/lib/utils";
+import type { Match } from "@/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NoMatchesEmptyState, NoOpportunitiesEmptyState } from "@/components/ui/empty-state";
@@ -63,7 +64,7 @@ export default function OpportunitiesPage() {
   });
 
   // Filter by search and category on client side (matches API doesn't support these)
-  const filteredItems = data?.items?.filter((match: any) => {
+  const filteredItems = data?.items?.filter((match: Match) => {
     const matchesSearch = !search ||
       match.opportunity_title?.toLowerCase().includes(search.toLowerCase()) ||
       match.opportunity_description?.toLowerCase().includes(search.toLowerCase());
@@ -149,7 +150,7 @@ export default function OpportunitiesPage() {
             {filter === "dismissed" && " (dismissed)"}
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredItems.map((match: any) => (
+            {filteredItems.map((match: Match) => (
               <MatchCard key={match.id || match._id} match={match} />
             ))}
           </div>
@@ -216,7 +217,7 @@ export default function OpportunitiesPage() {
   );
 }
 
-function MatchCard({ match }: { match: any }) {
+function MatchCard({ match }: { match: Match }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const matchId = match.id || match._id;

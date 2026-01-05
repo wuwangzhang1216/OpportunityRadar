@@ -41,6 +41,7 @@ interface OnboardingState {
   // Step 3: Top matches
   topMatches: Match[];
   isLoadingMatches: boolean;
+  matchError: string | null;
 
   // Suggestions from backend
   suggestions: OnboardingSuggestions | null;
@@ -86,6 +87,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   confirmError: null,
   topMatches: [],
   isLoadingMatches: false,
+  matchError: null,
   suggestions: null,
 
   setUrl: (url: string) => set({ url }),
@@ -236,26 +238,41 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   // Poll for matches with exponential backoff
   pollTopMatches: async (maxAttempts = 10) => {
-    set({ isLoadingMatches: true });
+    set({ isLoadingMatches: true, matchError: null });
+
+    let consecutiveErrors = 0;
+    const errorThreshold = 3;
 
     for (let i = 0; i < maxAttempts; i++) {
       try {
         const response = await apiClient.getTopMatches(5);
+        consecutiveErrors = 0; // Reset on success
+
         if (response.items?.length) {
-          set({ topMatches: response.items, isLoadingMatches: false });
+          set({ topMatches: response.items, isLoadingMatches: false, matchError: null });
           return;
         }
       } catch (error) {
-        // Ignore errors during polling
+        consecutiveErrors++;
+
+        // Surface error after threshold consecutive failures
+        if (consecutiveErrors >= errorThreshold) {
+          set({
+            isLoadingMatches: false,
+            matchError: "Unable to load matches. Please try again later.",
+          });
+          return;
+        }
       }
 
       // Exponential backoff: 250ms, 500ms, 1s, 2s, 2s, 2s...
       await new Promise((r) => setTimeout(r, Math.min(2000, 250 * 2 ** i)));
     }
 
-    // Max attempts reached
+    // Max attempts reached without matches
     set({
       isLoadingMatches: false,
+      matchError: "No matches found yet. Your matches are still being computed.",
     });
   },
 
@@ -281,5 +298,6 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       confirmError: null,
       topMatches: [],
       isLoadingMatches: false,
+      matchError: null,
     }),
 }));

@@ -1,7 +1,7 @@
 # 004: Background Task Event Loop Blocking
 
 ## Metadata
-- **Status**: pending
+- **Status**: resolved
 - **Priority**: P2 (Important)
 - **Issue ID**: 004
 - **Tags**: code-review, performance, architecture
