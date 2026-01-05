@@ -137,7 +137,7 @@ async def generate_materials(
             material_type=target,
             content=result.content,
             metadata=result.metadata or {},
-            model_used="gpt-4o-mini",
+            model_used="gpt-5.2",
         )
         await material.insert()
 

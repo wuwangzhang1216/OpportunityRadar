@@ -187,6 +187,221 @@ class MaterialGenerator:
             metadata={"project": project.name, "opportunity": opportunity.title},
         )
 
+    async def generate_submission_text(
+        self,
+        project: ProjectContext,
+        opportunity: OpportunityContext,
+        max_chars: int = 1000,
+    ) -> GenerationResult:
+        """Generate submission form text for hackathon/grant applications."""
+
+        prompt = f"""Create a compelling submission text for "{project.name}" applying to "{opportunity.title}".
+
+Project Details:
+- Problem: {project.problem}
+- Solution: {project.solution}
+- Tech Stack: {', '.join(project.tech_stack)}
+- Key Features: {', '.join(project.features)}
+
+Opportunity Themes: {', '.join(opportunity.themes)}
+
+Requirements:
+- Maximum {max_chars} characters
+- Focus on impact and innovation
+- Match the opportunity's themes
+- Be concise but compelling
+- Include measurable outcomes if possible
+
+Generate a submission text that will stand out to judges."""
+
+        system_prompt = """You are an expert at writing winning hackathon and grant submissions.
+Create concise, impactful text that highlights innovation and potential impact."""
+
+        content = await self.client.generate(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            max_tokens=1000,
+            temperature=0.7,
+        )
+
+        return GenerationResult(
+            content=content,
+            material_type="submission_text",
+            metadata={"project": project.name, "max_chars": max_chars},
+        )
+
+    async def generate_one_liner(
+        self,
+        project: ProjectContext,
+    ) -> GenerationResult:
+        """Generate a memorable one-liner tagline for the project."""
+
+        prompt = f"""Create 5 memorable one-liner taglines for "{project.name}".
+
+Project: {project.name}
+Problem it solves: {project.problem}
+Solution: {project.solution}
+
+Requirements for each tagline:
+- Maximum 10 words
+- Catchy and memorable
+- Explains the value proposition
+- Could work as a Twitter/X pitch
+
+Format: Number each tagline (1-5)."""
+
+        system_prompt = "You are a creative marketing expert who crafts memorable product taglines."
+
+        content = await self.client.generate(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            max_tokens=500,
+            temperature=0.8,
+        )
+
+        return GenerationResult(
+            content=content,
+            material_type="one_liner",
+            metadata={"project": project.name},
+        )
+
+    async def generate_technical_doc(
+        self,
+        project: ProjectContext,
+        doc_type: str = "architecture",
+    ) -> GenerationResult:
+        """Generate technical documentation.
+
+        Args:
+            project: Project context
+            doc_type: One of 'architecture', 'api', 'setup'
+        """
+
+        prompts = {
+            "architecture": f"""Create a technical architecture document for "{project.name}".
+
+Solution: {project.solution}
+Tech Stack: {', '.join(project.tech_stack)}
+Features: {', '.join(project.features)}
+
+Include:
+1. System Overview (high-level architecture)
+2. Component Diagram (describe in text)
+3. Data Flow
+4. Technology Choices and Rationale
+5. Scalability Considerations
+
+Format in Markdown.""",
+
+            "api": f"""Create API documentation for "{project.name}".
+
+Solution: {project.solution}
+Tech Stack: {', '.join(project.tech_stack)}
+Features: {', '.join(project.features)}
+
+Include for each endpoint:
+- HTTP method and path
+- Description
+- Request parameters
+- Response format
+- Example
+
+Format in Markdown with code blocks.""",
+
+            "setup": f"""Create a setup/installation guide for "{project.name}".
+
+Tech Stack: {', '.join(project.tech_stack)}
+Features: {', '.join(project.features)}
+{'Demo URL: ' + project.demo_url if project.demo_url else ''}
+
+Include:
+1. Prerequisites
+2. Installation Steps
+3. Configuration
+4. Running the Project
+5. Troubleshooting Common Issues
+
+Format in Markdown with code blocks.""",
+        }
+
+        prompt = prompts.get(doc_type, prompts["architecture"])
+        system_prompt = "You are a senior software architect who creates clear, comprehensive technical documentation."
+
+        content = await self.client.generate(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            max_tokens=3000,
+            temperature=0.5,
+        )
+
+        return GenerationResult(
+            content=content,
+            material_type=f"technical_{doc_type}",
+            metadata={"project": project.name, "doc_type": doc_type},
+        )
+
+    async def generate_social_media(
+        self,
+        project: ProjectContext,
+        platform: str = "twitter",
+    ) -> GenerationResult:
+        """Generate social media post for the project.
+
+        Args:
+            project: Project context
+            platform: One of 'twitter', 'linkedin', 'product_hunt'
+        """
+
+        platform_specs = {
+            "twitter": {
+                "max_chars": 280,
+                "style": "casual, engaging, uses emojis, includes relevant hashtags",
+                "name": "Twitter/X",
+            },
+            "linkedin": {
+                "max_chars": 3000,
+                "style": "professional, story-driven, focuses on impact and lessons learned",
+                "name": "LinkedIn",
+            },
+            "product_hunt": {
+                "max_chars": 500,
+                "style": "product-focused, highlights features and benefits, includes call-to-action",
+                "name": "Product Hunt",
+            },
+        }
+
+        spec = platform_specs.get(platform, platform_specs["twitter"])
+
+        prompt = f"""Create a {spec['name']} post for "{project.name}".
+
+Project: {project.name}
+Problem: {project.problem}
+Solution: {project.solution}
+Tech Stack: {', '.join(project.tech_stack)}
+{'Demo URL: ' + project.demo_url if project.demo_url else ''}
+
+Requirements:
+- Maximum {spec['max_chars']} characters
+- Style: {spec['style']}
+- Should drive engagement
+
+Create 3 variations."""
+
+        system_prompt = f"You are a social media expert who creates viral {spec['name']} content."
+
+        content = await self.client.generate(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            max_tokens=1500,
+            temperature=0.8,
+        )
+
+        return GenerationResult(
+            content=content,
+            material_type=f"social_{platform}",
+            metadata={"project": project.name, "platform": platform},
+        )
+
     async def generate_all(
         self,
         project: ProjectContext,
@@ -245,6 +460,27 @@ class MaterialGenerator:
                 elif target == "qa_pred":
                     results["qa_pred"] = await self.generate_qa_predictions(
                         project, opportunity
+                    )
+
+                elif target == "submission_text":
+                    max_chars = constraints.get("max_chars", 1000) if constraints else 1000
+                    results["submission_text"] = await self.generate_submission_text(
+                        project, opportunity, max_chars=max_chars
+                    )
+
+                elif target == "one_liner":
+                    results["one_liner"] = await self.generate_one_liner(project)
+
+                elif target.startswith("technical_"):
+                    doc_type = target.replace("technical_", "") or "architecture"
+                    results[target] = await self.generate_technical_doc(
+                        project, doc_type=doc_type
+                    )
+
+                elif target.startswith("social_"):
+                    platform = target.replace("social_", "") or "twitter"
+                    results[target] = await self.generate_social_media(
+                        project, platform=platform
                     )
 
                 else:

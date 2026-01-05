@@ -17,6 +17,9 @@ import {
   ChevronRight,
   Bell,
   Settings,
+  Users,
+  Send,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -28,7 +31,12 @@ const navItems = [
   { href: "/opportunities", label: "Opportunities", icon: Search },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/generator", label: "AI Generator", icon: Sparkles },
+  { href: "/teams", label: "Teams", icon: Users },
+  { href: "/community", label: "Community", icon: Globe },
+  { href: "/submissions", label: "Submissions", icon: Send },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/profile", label: "Profile", icon: User },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 const adminNavItem = { href: "/admin", label: "Admin", icon: Settings };
 
@@ -304,9 +312,9 @@ export default function DashboardLayout({
               <span className="font-bold text-foreground">OpportunityRadar</span>
             </Link>
             <div className="flex items-center gap-2">
-              <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
+              <Link href="/notifications" className="p-2 rounded-lg hover:bg-secondary transition-colors">
                 <Bell className="h-5 w-5 text-muted-foreground" />
-              </button>
+              </Link>
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="p-2 rounded-lg hover:bg-secondary transition-colors"
