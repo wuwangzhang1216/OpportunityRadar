@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiClient } from "@/services/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-  const { setUser } = useAuthStore();
+  const { checkAuth } = useAuthStore();
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -36,9 +36,9 @@ export default function OAuthCallbackPage() {
         if (response.access_token) {
           apiClient.setToken(response.access_token);
 
-          // Fetch user data
+          // Fetch user data and update auth state
+          await checkAuth();
           const userData = await apiClient.getMe();
-          setUser(userData);
 
           // Check if onboarding is needed
           if (!userData.has_profile) {
@@ -56,7 +56,7 @@ export default function OAuthCallbackPage() {
     };
 
     handleCallback();
-  }, [searchParams, router, setUser]);
+  }, [searchParams, router, checkAuth]);
 
   if (error) {
     return (
@@ -80,5 +80,20 @@ export default function OAuthCallbackPage() {
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4" />
       <p className="text-gray-600">Completing authentication...</p>
     </div>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      }
+    >
+      <OAuthCallbackContent />
+    </Suspense>
   );
 }

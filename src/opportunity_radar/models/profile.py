@@ -40,6 +40,7 @@ class Profile(Document):
     preferred_team_size_max: int = 5
     goals: List[str] = Field(default_factory=list)
     interests: List[str] = Field(default_factory=list)
+    industries: List[str] = Field(default_factory=list)  # e.g., FinTech, HealthTech, AI/ML
     location_country: Optional[str] = None
     location_region: Optional[str] = None
     student_status: Optional[str] = None

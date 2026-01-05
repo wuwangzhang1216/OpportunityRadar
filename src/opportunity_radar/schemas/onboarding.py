@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import Any, List, Optional, Union
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 
 class URLType(str, Enum):
@@ -61,11 +61,11 @@ class OnboardingConfirmRequest(BaseModel):
     """Request to confirm and create profile from extracted data."""
 
     # User-confirmed values (after editing extracted data)
-    display_name: Optional[str] = None
+    display_name: str = Field(..., min_length=1, description="Display name is required")
     bio: Optional[str] = None
-    tech_stack: List[str] = Field(default_factory=list)
+    tech_stack: List[str] = Field(..., min_length=1, description="At least one tech stack item required")
     industries: List[str] = Field(default_factory=list)
-    goals: List[str] = Field(default_factory=list)
+    goals: List[str] = Field(..., min_length=1, description="At least one goal required")
     interests: List[str] = Field(default_factory=list)
     experience_level: Optional[str] = None
     team_size: int = Field(default=1, ge=1, le=100)
@@ -75,6 +75,27 @@ class OnboardingConfirmRequest(BaseModel):
 
     # Source URL for reference
     source_url: Optional[str] = None
+
+    @field_validator('display_name')
+    @classmethod
+    def display_name_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError('Display name is required')
+        return v.strip()
+
+    @field_validator('tech_stack')
+    @classmethod
+    def tech_stack_not_empty(cls, v: List[str]) -> List[str]:
+        if not v or len(v) == 0:
+            raise ValueError('At least one tech stack item is required')
+        return v
+
+    @field_validator('goals')
+    @classmethod
+    def goals_not_empty(cls, v: List[str]) -> List[str]:
+        if not v or len(v) == 0:
+            raise ValueError('At least one goal is required')
+        return v
 
 
 class OnboardingConfirmResponse(BaseModel):

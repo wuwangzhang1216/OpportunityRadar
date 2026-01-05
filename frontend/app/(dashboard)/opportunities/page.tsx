@@ -25,6 +25,7 @@ import { apiClient } from "@/services/api-client";
 import { formatDate, formatCurrency, formatRelativeTime } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { NoMatchesEmptyState, NoOpportunitiesEmptyState } from "@/components/ui/empty-state";
 
 const categories = [
   { value: "", label: "All" },
@@ -176,33 +177,40 @@ export default function OpportunitiesPage() {
             </div>
           )}
         </>
-      ) : (
+      ) : data?.total === 0 && filter === "all" && !search && !category ? (
+        // No matches at all - profile likely incomplete
+        <NoMatchesEmptyState />
+      ) : filter === "bookmarked" ? (
         <div className="text-center py-12">
-          <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium text-foreground">
-            {filter === "bookmarked"
-              ? "No bookmarked opportunities"
-              : filter === "dismissed"
-              ? "No dismissed opportunities"
-              : "No opportunities found"}
-          </h3>
+          <Bookmark className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium text-foreground">No bookmarked opportunities</h3>
           <p className="text-muted-foreground mt-1">
-            {filter === "bookmarked"
-              ? "Bookmark opportunities you're interested in to see them here"
-              : filter === "dismissed"
-              ? "Dismissed opportunities will appear here"
-              : "Try adjusting your search or filters"}
+            Bookmark opportunities you're interested in to see them here
           </p>
-          {filter !== "all" && (
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => setFilter("all")}
-            >
-              View all opportunities
-            </Button>
-          )}
+          <Button variant="outline" className="mt-4" onClick={() => setFilter("all")}>
+            View all opportunities
+          </Button>
         </div>
+      ) : filter === "dismissed" ? (
+        <div className="text-center py-12">
+          <X className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium text-foreground">No dismissed opportunities</h3>
+          <p className="text-muted-foreground mt-1">
+            Dismissed opportunities will appear here
+          </p>
+          <Button variant="outline" className="mt-4" onClick={() => setFilter("all")}>
+            View all opportunities
+          </Button>
+        </div>
+      ) : (
+        // Filtered results empty
+        <NoOpportunitiesEmptyState
+          onClearFilters={() => {
+            setSearch("");
+            setCategory("");
+            setFilter("all");
+          }}
+        />
       )}
     </div>
   );

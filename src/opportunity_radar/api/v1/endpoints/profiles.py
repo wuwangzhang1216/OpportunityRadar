@@ -1,8 +1,9 @@
 """Profile API endpoints."""
 
+import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from ....models.profile import Profile, TeamMember
 from ....models.user import User
@@ -10,6 +11,20 @@ from ....core.security import get_current_user
 from ....schemas.profile import ProfileCreate, ProfileUpdate, ProfileResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+async def recalculate_matches_background(user_id: str, profile_id: str):
+    """Background task to recalculate matches after profile update."""
+    try:
+        from ....services.mongo_matching_service import MongoMatchingService
+
+        service = MongoMatchingService()
+        matches = await service.compute_matches_for_profile(profile_id, limit=100, min_score=0.0)
+        await service.save_matches(user_id, matches)
+        logger.info(f"Recalculated {len(matches)} matches for user {user_id} after profile update")
+    except Exception as e:
+        logger.error(f"Failed to recalculate matches for user {user_id}: {e}")
 
 
 @router.get("/me", response_model=ProfileResponse)
@@ -128,6 +143,7 @@ async def create_profile(
 @router.put("/me", response_model=ProfileResponse)
 async def update_profile(
     profile_data: ProfileUpdate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
 ):
     """Update current user's profile."""
@@ -164,6 +180,13 @@ async def update_profile(
 
     profile.updated_at = datetime.utcnow()
     await profile.save()
+
+    # Trigger background match recalculation
+    background_tasks.add_task(
+        recalculate_matches_background,
+        str(current_user.id),
+        str(profile.id),
+    )
 
     return ProfileResponse(
         id=str(profile.id),

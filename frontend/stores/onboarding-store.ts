@@ -55,6 +55,7 @@ interface OnboardingState {
   confirmProfile: () => Promise<void>;
   loadSuggestions: () => Promise<void>;
   loadTopMatches: () => Promise<void>;
+  pollTopMatches: (maxAttempts?: number) => Promise<void>;
   goToStep: (step: OnboardingStep) => void;
   skipToManual: () => void;
   reset: () => void;
@@ -196,8 +197,8 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         currentStep: 3,
       });
 
-      // Load top matches after profile is created
-      get().loadTopMatches();
+      // Poll for top matches after profile is created (matches computed in background)
+      get().pollTopMatches();
     } catch (error: any) {
       set({
         confirmError:
@@ -231,6 +232,31 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       console.error("Failed to load top matches:", error);
       set({ isLoadingMatches: false });
     }
+  },
+
+  // Poll for matches with exponential backoff
+  pollTopMatches: async (maxAttempts = 10) => {
+    set({ isLoadingMatches: true });
+
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const response = await apiClient.getTopMatches(5);
+        if (response.items?.length) {
+          set({ topMatches: response.items, isLoadingMatches: false });
+          return;
+        }
+      } catch (error) {
+        // Ignore errors during polling
+      }
+
+      // Exponential backoff: 250ms, 500ms, 1s, 2s, 2s, 2s...
+      await new Promise((r) => setTimeout(r, Math.min(2000, 250 * 2 ** i)));
+    }
+
+    // Max attempts reached
+    set({
+      isLoadingMatches: false,
+    });
   },
 
   goToStep: (step: OnboardingStep) => set({ currentStep: step }),

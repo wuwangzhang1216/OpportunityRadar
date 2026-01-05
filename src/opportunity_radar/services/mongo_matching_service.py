@@ -507,6 +507,9 @@ class MongoMatchingService:
         """
         Save computed matches to database.
 
+        Cleans up stale matches (non-bookmarked, non-dismissed) that are no longer
+        in the computed results, while preserving user actions (bookmarks/dismissals).
+
         Args:
             user_id: The user ID
             match_results: List of match results to save
@@ -515,9 +518,30 @@ class MongoMatchingService:
             Number of matches saved/updated
         """
         from beanie import PydanticObjectId
+        from beanie.operators import In, NotIn
 
         count = 0
         user_oid = PydanticObjectId(user_id)
+
+        # Get the opportunity IDs from new match results
+        new_opp_ids = {PydanticObjectId(r.opportunity_id) for r in match_results}
+
+        # Clean up stale matches: remove matches for opportunities no longer in results
+        # BUT preserve bookmarked and dismissed matches (user actions should persist)
+        if new_opp_ids:
+            await Match.find(
+                Match.user_id == user_oid,
+                NotIn(Match.opportunity_id, list(new_opp_ids)),
+                Match.is_bookmarked == False,
+                Match.is_dismissed == False,
+            ).delete()
+        else:
+            # If no new matches, still clean up non-actioned matches
+            await Match.find(
+                Match.user_id == user_oid,
+                Match.is_bookmarked == False,
+                Match.is_dismissed == False,
+            ).delete()
 
         for result in match_results:
             opp_oid = PydanticObjectId(result.opportunity_id)
