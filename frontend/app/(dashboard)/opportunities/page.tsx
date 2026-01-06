@@ -223,8 +223,8 @@ function MatchCard({ match }: { match: Match }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { warning, success } = useToast();
-  const matchId = match.id || match._id;
-  const batchId = match.batch_id;
+  const matchId = match.id || match._id || "";
+  const batchId = match.batch_id || match.opportunity_id;
 
   const categoryColors: Record<string, string> = {
     hackathon: "bg-sky-100 text-sky-800",
