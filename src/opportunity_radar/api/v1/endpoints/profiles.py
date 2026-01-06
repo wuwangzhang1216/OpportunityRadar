@@ -15,10 +15,31 @@ logger = logging.getLogger(__name__)
 
 
 async def recalculate_matches_background(user_id: str, profile_id: str):
-    """Background task to recalculate matches after profile update."""
+    """Background task to regenerate embedding and recalculate matches after profile update."""
     try:
+        from beanie import PydanticObjectId
         from ....services.mongo_matching_service import MongoMatchingService
+        from ....services.embedding_service import get_embedding_service
 
+        # First, regenerate the profile embedding
+        profile = await Profile.get(PydanticObjectId(profile_id))
+        if profile:
+            embedding_service = get_embedding_service()
+            embedding_text = embedding_service.create_profile_embedding_text(
+                tech_stack=profile.tech_stack or [],
+                industries=profile.interests or [],
+                intents=profile.goals or [],
+                profile_type=profile.company_stage,
+                stage=profile.funding_stage,
+                bio=profile.bio or profile.product_description,
+                display_name=profile.display_name or profile.team_name,
+            )
+            embedding = embedding_service.get_embedding(embedding_text)
+            profile.embedding = embedding
+            await profile.save()
+            logger.info(f"Regenerated embedding for profile {profile_id}")
+
+        # Then recalculate matches
         service = MongoMatchingService()
         matches = await service.compute_matches_for_profile(profile_id, limit=100, min_score=0.0)
         await service.save_matches(user_id, matches)

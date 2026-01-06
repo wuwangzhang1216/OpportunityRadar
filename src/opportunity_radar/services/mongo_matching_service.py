@@ -498,9 +498,9 @@ class MongoMatchingService:
                 # Update existing match
                 existing.overall_score = result.score
                 existing.semantic_score = result.breakdown.semantic_score
-                existing.rule_score = result.breakdown.eligibility_score
-                existing.time_score = result.breakdown.time_score
-                existing.team_score = result.breakdown.team_score
+                existing.rule_score = None  # Not used in simplified scoring
+                existing.time_score = result.breakdown.recency_boost
+                existing.team_score = 1.0 if result.breakdown.team_size_eligible else 0.0
                 existing.score_breakdown = result.breakdown.to_dict()
                 existing.eligibility_status = "eligible" if result.breakdown.is_eligible else "ineligible"
                 existing.eligibility_issues = result.eligibility_issues
@@ -514,9 +514,9 @@ class MongoMatchingService:
                     opportunity_id=opp_oid,
                     overall_score=result.score,
                     semantic_score=result.breakdown.semantic_score,
-                    rule_score=result.breakdown.eligibility_score,
-                    time_score=result.breakdown.time_score,
-                    team_score=result.breakdown.team_score,
+                    rule_score=None,  # Not used in simplified scoring
+                    time_score=result.breakdown.recency_boost,
+                    team_score=1.0 if result.breakdown.team_size_eligible else 0.0,
                     score_breakdown=result.breakdown.to_dict(),
                     eligibility_status="eligible" if result.breakdown.is_eligible else "ineligible",
                     eligibility_issues=result.eligibility_issues,
