@@ -16,6 +16,10 @@ import {
   Star,
   Filter,
   SlidersHorizontal,
+  Zap,
+  Rocket,
+  Clock,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -222,9 +226,10 @@ export default function OpportunitiesPage() {
 function MatchCard({ match }: { match: Match }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { warning, success } = useToast();
+  const { warning, success, error } = useToast();
   const matchId = match.id || match._id || "";
   const batchId = match.batch_id || match.opportunity_id;
+  const [isQuickPrepLoading, setIsQuickPrepLoading] = useState(false);
 
   const categoryColors: Record<string, string> = {
     hackathon: "bg-sky-100 text-sky-800",
@@ -304,6 +309,30 @@ function MatchCard({ match }: { match: Match }) {
     },
   });
 
+  // Quick Prep: Add to pipeline (preparing stage) and navigate to generator
+  const handleQuickPrep = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsQuickPrepLoading(true);
+    try {
+      // Add to pipeline in "preparing" stage directly
+      await apiClient.addToPipeline(batchId, "preparing");
+      queryClient.invalidateQueries({ queryKey: ["pipelineStats"] });
+      queryClient.invalidateQueries({ queryKey: ["pipelines"] });
+      success("Added to Pipeline", "Opening material generator...");
+      // Navigate to generator with the opportunity context
+      router.push(`/generator?batch_id=${batchId}`);
+    } catch (err: any) {
+      // If already in pipeline, just navigate to generator
+      if (err?.response?.status === 400) {
+        router.push(`/generator?batch_id=${batchId}`);
+      } else {
+        error("Error", "Failed to add to pipeline");
+      }
+    } finally {
+      setIsQuickPrepLoading(false);
+    }
+  };
+
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't navigate if clicking on action buttons
     if ((e.target as HTMLElement).closest('button')) {
@@ -312,14 +341,27 @@ function MatchCard({ match }: { match: Match }) {
     router.push(`/opportunities/${batchId}`);
   };
 
+  // Calculate urgency for deadline
+  const getDeadlineUrgency = () => {
+    if (!match.deadline) return null;
+    const daysLeft = Math.ceil((new Date(match.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0) return { level: "expired", daysLeft, color: "text-gray-500" };
+    if (daysLeft <= 3) return { level: "critical", daysLeft, color: "text-urgency-critical" };
+    if (daysLeft <= 7) return { level: "urgent", daysLeft, color: "text-urgency-urgent" };
+    if (daysLeft <= 14) return { level: "warning", daysLeft, color: "text-urgency-warning" };
+    return { level: "safe", daysLeft, color: "text-urgency-safe" };
+  };
+
+  const urgency = getDeadlineUrgency();
+
   return (
     <Card
-      className="h-full hover:shadow-md transition cursor-pointer border-border group relative"
+      className="h-full hover:shadow-md transition cursor-pointer border-border group relative flex flex-col"
       onClick={handleCardClick}
     >
-      <CardContent className="pt-6">
+      <CardContent className="pt-6 flex-1 flex flex-col">
         {/* Quick action buttons - visible on hover */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
           <Button
             size="icon"
             variant="ghost"
@@ -460,6 +502,48 @@ function MatchCard({ match }: { match: Match }) {
             <Badge variant="outline" className="text-xs text-gray-500">
               Dismissed
             </Badge>
+          )}
+        </div>
+
+        {/* Quick Prep Action Button - Always visible at bottom */}
+        <div className="mt-auto pt-4 border-t border-border mt-4">
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="flex-1 group/btn bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
+              onClick={handleQuickPrep}
+              disabled={isQuickPrepLoading}
+            >
+              {isQuickPrepLoading ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                  Preparing...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mr-1.5 group-hover/btn:animate-pulse" />
+                  Quick Prep
+                </>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/opportunities/${batchId}`);
+              }}
+            >
+              Details
+            </Button>
+          </div>
+          {urgency && urgency.level !== "safe" && urgency.level !== "expired" && (
+            <p className={`text-xs mt-2 flex items-center gap-1 ${urgency.color}`}>
+              <Clock className="h-3 w-3" />
+              {urgency.daysLeft === 0 ? "Due today!" :
+               urgency.daysLeft === 1 ? "Due tomorrow!" :
+               `${urgency.daysLeft} days left`}
+            </p>
           )}
         </div>
       </CardContent>

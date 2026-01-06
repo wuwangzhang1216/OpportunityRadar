@@ -12,6 +12,12 @@ import {
   FileText,
   TrendingUp,
   Zap,
+  CheckCircle2,
+  Trophy,
+  Calendar,
+  Rocket,
+  ListChecks,
+  MessageSquare,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,18 +25,24 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/services/api-client";
 
 interface Recommendation {
-  type: "deadline" | "material" | "opportunity" | "profile";
+  type: "deadline" | "material" | "opportunity" | "profile" | "result" | "review";
   priority: "high" | "medium" | "low";
   title: string;
   description: string;
   actionLabel: string;
   actionUrl: string;
+  secondaryAction?: {
+    label: string;
+    url: string;
+  };
   metadata?: {
     daysLeft?: number;
     opportunityId?: string;
     opportunityTitle?: string;
     materialsReady?: number;
     materialsTotal?: number;
+    scorePercent?: number;
+    status?: string;
   };
 }
 
@@ -52,8 +64,30 @@ function getRecommendationIcon(type: Recommendation["type"]) {
       return Target;
     case "profile":
       return TrendingUp;
+    case "result":
+      return Trophy;
+    case "review":
+      return MessageSquare;
     default:
       return Zap;
+  }
+}
+
+function getRecommendationColor(type: Recommendation["type"], priority: Recommendation["priority"]) {
+  if (priority === "high") return "bg-urgency-critical/10 text-urgency-critical";
+  if (priority === "medium") return "bg-urgency-warning/10 text-urgency-warning";
+
+  switch (type) {
+    case "opportunity":
+      return "bg-primary/10 text-primary";
+    case "material":
+      return "bg-purple-500/10 text-purple-600";
+    case "result":
+      return "bg-green-500/10 text-green-600";
+    case "review":
+      return "bg-orange-500/10 text-orange-600";
+    default:
+      return "bg-primary/10 text-primary";
   }
 }
 
@@ -112,16 +146,57 @@ export function TodaysFocusCard() {
   const preparingItems = pipelineItems.filter((item: any) => item.status === "preparing");
   if (preparingItems.length > 0) {
     const itemNeedingMaterials = preparingItems[0];
+    // Calculate days left for preparing item
+    let prepDaysLeft = null;
+    if (itemNeedingMaterials.deadline) {
+      const deadline = new Date(itemNeedingMaterials.deadline);
+      prepDaysLeft = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    }
     recommendations.push({
       type: "material",
-      priority: "medium",
-      title: "Generate Materials",
+      priority: prepDaysLeft !== null && prepDaysLeft <= 7 ? "high" : "medium",
+      title: "Continue Preparation",
       description: `Create winning materials for "${itemNeedingMaterials.opportunity_title}"`,
-      actionLabel: "Generate Now",
+      actionLabel: "Generate Materials",
       actionUrl: `/generator?batch_id=${itemNeedingMaterials.opportunity_id}`,
+      secondaryAction: {
+        label: "View Details",
+        url: `/opportunities/${itemNeedingMaterials.opportunity_id}`,
+      },
       metadata: {
         opportunityId: itemNeedingMaterials.opportunity_id,
         opportunityTitle: itemNeedingMaterials.opportunity_title,
+        daysLeft: prepDaysLeft || undefined,
+      },
+    });
+  }
+
+  // Check for submitted items that may need result logging (past deadline)
+  const submittedItems = pipelineItems.filter((item: any) => item.status === "submitted" || item.status === "pending");
+  const itemsNeedingResult = submittedItems.filter((item: any) => {
+    if (!item.deadline) return false;
+    const deadline = new Date(item.deadline);
+    const daysSinceDeadline = Math.ceil((Date.now() - deadline.getTime()) / (1000 * 60 * 60 * 24));
+    return daysSinceDeadline > 7; // More than a week past deadline, probably have results
+  });
+
+  if (itemsNeedingResult.length > 0) {
+    const item = itemsNeedingResult[0];
+    recommendations.push({
+      type: "result",
+      priority: "medium",
+      title: "Log Your Result",
+      description: `Did you hear back from "${item.opportunity_title}"? Track your outcome to improve future recommendations.`,
+      actionLabel: "Won It!",
+      actionUrl: `/pipeline?mark_won=${item.id || item._id}`,
+      secondaryAction: {
+        label: "Didn't Win",
+        url: `/pipeline?archive=${item.id || item._id}`,
+      },
+      metadata: {
+        opportunityId: item.opportunity_id,
+        opportunityTitle: item.opportunity_title,
+        status: item.status,
       },
     });
   }
@@ -133,11 +208,19 @@ export function TodaysFocusCard() {
     const score = Math.round((topMatch.score || topMatch.overall_score || 0) * 100);
     recommendations.push({
       type: "opportunity",
-      priority: "low",
-      title: `${score}% Match Found`,
+      priority: score >= 85 ? "medium" : "low",
+      title: score >= 85 ? "Excellent Match!" : `${score}% Match Found`,
       description: topMatch.opportunity_title,
-      actionLabel: "View Match",
-      actionUrl: `/opportunities/${topMatch.batch_id}`,
+      actionLabel: score >= 85 ? "Quick Prep" : "View Match",
+      actionUrl: score >= 85 ? `/generator?batch_id=${topMatch.batch_id}` : `/opportunities/${topMatch.batch_id}`,
+      secondaryAction: score >= 85 ? {
+        label: "View Details",
+        url: `/opportunities/${topMatch.batch_id}`,
+      } : undefined,
+      metadata: {
+        scorePercent: score,
+        opportunityId: topMatch.batch_id,
+      },
     });
   }
 
@@ -183,23 +266,15 @@ export function TodaysFocusCard() {
           {/* Primary Recommendation */}
           <div className="p-6">
             <div className="flex items-start gap-4">
-              <div className={`p-3 rounded-xl ${
-                primaryRec.priority === "high"
-                  ? "bg-urgency-critical/10"
-                  : primaryRec.priority === "medium"
-                  ? "bg-urgency-warning/10"
-                  : "bg-primary/10"
-              }`}>
+              <div className={`p-3 rounded-xl ${getRecommendationColor(primaryRec.type, primaryRec.priority)}`}>
                 {primaryRec.priority === "high" ? (
-                  <AlertTriangle className={`h-6 w-6 text-urgency-critical`} />
+                  <AlertTriangle className="h-6 w-6" />
                 ) : (
-                  <PrimaryIcon className={`h-6 w-6 ${
-                    primaryRec.priority === "medium" ? "text-urgency-warning" : "text-primary"
-                  }`} />
+                  <PrimaryIcon className="h-6 w-6" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   {primaryRec.metadata?.daysLeft !== undefined && (
                     <Badge variant={getUrgencyVariant(primaryRec.metadata.daysLeft)} size="sm">
                       {primaryRec.metadata.daysLeft === 0
@@ -209,15 +284,39 @@ export function TodaysFocusCard() {
                         : `${primaryRec.metadata.daysLeft} days left`}
                     </Badge>
                   )}
+                  {primaryRec.metadata?.scorePercent !== undefined && primaryRec.metadata.scorePercent >= 85 && (
+                    <Badge variant="ai" size="sm">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      {primaryRec.metadata.scorePercent}% Match
+                    </Badge>
+                  )}
+                  {primaryRec.type === "result" && (
+                    <Badge variant="secondary" size="sm">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Track Outcome
+                    </Badge>
+                  )}
                 </div>
                 <h4 className="font-semibold text-lg mb-1 truncate">{primaryRec.title}</h4>
-                <p className="text-sm text-muted-foreground mb-4">{primaryRec.description}</p>
-                <Link href={primaryRec.actionUrl}>
-                  <Button className="group">
-                    {primaryRec.actionLabel}
-                    <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </Link>
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{primaryRec.description}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link href={primaryRec.actionUrl}>
+                    <Button className="group" size="sm">
+                      {primaryRec.type === "result" && <Trophy className="h-4 w-4 mr-1.5" />}
+                      {primaryRec.type === "material" && <Sparkles className="h-4 w-4 mr-1.5" />}
+                      {primaryRec.type === "opportunity" && primaryRec.metadata?.scorePercent && primaryRec.metadata.scorePercent >= 85 && <Zap className="h-4 w-4 mr-1.5" />}
+                      {primaryRec.actionLabel}
+                      <ArrowRight className="h-4 w-4 ml-1.5 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </Link>
+                  {primaryRec.secondaryAction && (
+                    <Link href={primaryRec.secondaryAction.url}>
+                      <Button variant="outline" size="sm">
+                        {primaryRec.secondaryAction.label}
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
           </div>

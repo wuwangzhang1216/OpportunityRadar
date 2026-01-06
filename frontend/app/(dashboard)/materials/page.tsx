@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
   Mic,
@@ -19,12 +20,16 @@ import {
   ChevronDown,
   ChevronUp,
   Plus,
+  History,
+  RefreshCw,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/services/api-client";
 import { formatRelativeTime } from "@/lib/utils";
+import { VersionHistory, VersionCompare } from "@/components/materials/version-history";
 
 const materialTypeInfo: Record<string, { icon: any; label: string; color: string }> = {
   readme: { icon: FileText, label: "README", color: "bg-primary" },
@@ -106,7 +111,9 @@ export default function MaterialsPage() {
 
 function MaterialCard({ material }: { material: any }) {
   const [expanded, setExpanded] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [compareVersions, setCompareVersions] = useState<{ v1: any; v2: any } | null>(null);
   const queryClient = useQueryClient();
 
   const materialId = material.id || material._id;
@@ -130,102 +137,190 @@ function MaterialCard({ material }: { material: any }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Mock version history - in production this would come from API
+  const mockVersions = material.version > 1
+    ? Array.from({ length: material.version }, (_, i) => ({
+        id: `${materialId}-v${material.version - i}`,
+        version: material.version - i,
+        content: i === 0 ? material.content : `[Previous version ${material.version - i} content]`,
+        created_at: new Date(
+          new Date(material.created_at).getTime() - i * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        is_current: i === 0,
+      }))
+    : [
+        {
+          id: `${materialId}-v1`,
+          version: 1,
+          content: material.content,
+          created_at: material.created_at,
+          is_current: true,
+        },
+      ];
+
+  const handleRestore = (version: any) => {
+    // In production, this would call an API to restore the version
+    console.log("Restoring version:", version);
+    alert(`Version ${version.version} would be restored. This feature requires backend support.`);
+  };
+
+  const handleCompare = (v1: any, v2: any) => {
+    setCompareVersions({ v1, v2 });
+  };
+
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-secondary/30 py-4">
-        <div className="flex items-center gap-3">
-          <div className={`h-10 w-10 rounded-xl ${typeInfo.color} flex items-center justify-center`}>
-            <Icon className="h-5 w-5 text-white" />
-          </div>
-          <div>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+      >
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-secondary/30 py-4">
+            <div className="flex items-center gap-3">
+              <div className={`h-10 w-10 rounded-xl ${typeInfo.color} flex items-center justify-center`}>
+                <Icon className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-base">{material.title || typeInfo.label}</CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    {typeInfo.label}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatRelativeTime(material.created_at)}
+                  </span>
+                  {material.opportunity_title && (
+                    <span className="flex items-center gap-1">
+                      For: {material.opportunity_title}
+                    </span>
+                  )}
+                  {material.version > 1 && (
+                    <button
+                      onClick={() => setShowHistory(!showHistory)}
+                      className="flex items-center gap-1 hover:text-primary transition-colors"
+                    >
+                      <History className="h-3 w-3" />
+                      <Badge variant="outline" className="text-xs cursor-pointer hover:bg-secondary">
+                        v{material.version}
+                      </Badge>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
-              <CardTitle className="text-base">{material.title || typeInfo.label}</CardTitle>
-              <Badge variant="secondary" className="text-xs">
-                {typeInfo.label}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {formatRelativeTime(material.created_at)}
-              </span>
-              {material.opportunity_title && (
-                <span className="flex items-center gap-1">
-                  For: {material.opportunity_title}
-                </span>
-              )}
               {material.version > 1 && (
-                <Badge variant="outline" className="text-xs">
-                  v{material.version}
-                </Badge>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowHistory(!showHistory)}
+                  className={showHistory ? "bg-secondary" : ""}
+                >
+                  <History className="h-4 w-4" />
+                </Button>
               )}
+              <Button size="sm" variant="outline" onClick={copyToClipboard}>
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-1 text-green-600" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-1" />
+                    Copy
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  if (confirm("Are you sure you want to delete this material?")) {
+                    deleteMutation.mutate();
+                  }
+                }}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={copyToClipboard}>
-            {copied ? (
-              <>
-                <Check className="h-4 w-4 mr-1 text-green-600" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4 mr-1" />
-                Copy
-              </>
-            )}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-            onClick={() => {
-              if (confirm("Are you sure you want to delete this material?")) {
-                deleteMutation.mutate();
-              }
-            }}
-            disabled={deleteMutation.isPending}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
+          </CardHeader>
 
-      {expanded && (
-        <CardContent className="p-0">
-          <pre className="whitespace-pre-wrap text-sm p-6 overflow-x-auto max-h-[500px] bg-secondary/10 scrollbar-modern">
-            {material.content}
-          </pre>
-        </CardContent>
-      )}
+          {/* Version History Panel */}
+          <AnimatePresence>
+            {showHistory && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-b border-border bg-secondary/10 overflow-hidden"
+              >
+                <div className="p-4">
+                  <VersionHistory
+                    materialId={materialId}
+                    currentVersion={material.version}
+                    versions={mockVersions}
+                    onRestore={handleRestore}
+                    onCompare={handleCompare}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      {!expanded && (
-        <CardContent className="py-3">
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {material.content?.substring(0, 200)}...
-          </p>
-          <Button
-            variant="link"
-            size="sm"
-            className="px-0 mt-1"
-            onClick={() => setExpanded(true)}
-          >
-            Show full content
-          </Button>
-        </CardContent>
-      )}
-    </Card>
+          {expanded && (
+            <CardContent className="p-0">
+              <pre className="whitespace-pre-wrap text-sm p-6 overflow-x-auto max-h-[500px] bg-secondary/10 scrollbar-modern">
+                {material.content}
+              </pre>
+            </CardContent>
+          )}
+
+          {!expanded && (
+            <CardContent className="py-3">
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {material.content?.substring(0, 200)}...
+              </p>
+              <Button
+                variant="link"
+                size="sm"
+                className="px-0 mt-1"
+                onClick={() => setExpanded(true)}
+              >
+                Show full content
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+      </motion.div>
+
+      {/* Version Compare Modal */}
+      <AnimatePresence>
+        {compareVersions && (
+          <VersionCompare
+            version1={compareVersions.v1}
+            version2={compareVersions.v2}
+            onClose={() => setCompareVersions(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }

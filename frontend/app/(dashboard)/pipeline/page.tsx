@@ -25,6 +25,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import Link from "next/link";
 import { Tooltip } from "@/components/ui/tooltip";
 import { HelpCircle } from "lucide-react";
+import { ResultFeedbackModal, ResultFeedback } from "@/components/pipeline/result-feedback-modal";
 
 interface Stage {
   id: string;
@@ -180,6 +181,7 @@ export default function PipelinePage() {
   const [draggedItem, setDraggedItem] = useState<any>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [mobileStageIndex, setMobileStageIndex] = useState(0);
+  const [feedbackItem, setFeedbackItem] = useState<{ item: any; outcome: "won" | "lost" | "withdrew" } | null>(null);
 
   const { data: pipelineData, isLoading, error } = useQuery({
     queryKey: ["pipelines"],
@@ -261,6 +263,26 @@ export default function PipelinePage() {
 
   const goToNextStage = () => {
     setMobileStageIndex((prev) => Math.min(activeStages.length - 1, prev + 1));
+  };
+
+  const handleMarkOutcome = (item: any, outcome: "won" | "lost" | "withdrew") => {
+    setFeedbackItem({ item, outcome });
+  };
+
+  const handleFeedbackSubmit = async (feedback: ResultFeedback) => {
+    if (!feedbackItem) return;
+
+    const pipelineId = feedbackItem.item.id || feedbackItem.item._id;
+    const targetStage = feedback.outcome === "won" ? "won" : "lost";
+
+    // Move to appropriate stage
+    await moveMutation.mutateAsync({ pipelineId, stage: targetStage });
+
+    // In production, also save the feedback to the backend
+    console.log("Feedback submitted:", { pipelineId, feedback });
+
+    // Close modal
+    setFeedbackItem(null);
   };
 
   return (
@@ -372,9 +394,8 @@ export default function PipelinePage() {
                       deleteMutation.mutate(item.id || item._id);
                     }
                   }}
-                  onArchive={() =>
-                    moveMutation.mutate({ pipelineId: item.id || item._id, stage: "lost" })
-                  }
+                  onMarkWon={() => handleMarkOutcome(item, "won")}
+                  onMarkLost={() => handleMarkOutcome(item, "lost")}
                   onDragStart={(e) => handleDragStart(e, item)}
                   onDragEnd={handleDragEnd}
                   isDragging={false}
@@ -465,9 +486,8 @@ export default function PipelinePage() {
                           deleteMutation.mutate(item.id || item._id);
                         }
                       }}
-                      onArchive={() =>
-                        moveMutation.mutate({ pipelineId: item.id || item._id, stage: "lost" })
-                      }
+                      onMarkWon={() => handleMarkOutcome(item, "won")}
+                      onMarkLost={() => handleMarkOutcome(item, "lost")}
                       onDragStart={(e) => handleDragStart(e, item)}
                       onDragEnd={handleDragEnd}
                       isDragging={(draggedItem?.id || draggedItem?._id) === (item.id || item._id)}
@@ -537,6 +557,19 @@ export default function PipelinePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Result Feedback Modal */}
+      <AnimatePresence>
+        {feedbackItem && (
+          <ResultFeedbackModal
+            isOpen={true}
+            onClose={() => setFeedbackItem(null)}
+            onSubmit={handleFeedbackSubmit}
+            opportunityTitle={feedbackItem.item.opportunity_title || "Untitled"}
+            initialOutcome={feedbackItem.outcome}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -547,7 +580,8 @@ function PipelineCard({
   stages: stagesParam,
   onMove,
   onDelete,
-  onArchive,
+  onMarkWon,
+  onMarkLost,
   onDragStart,
   onDragEnd,
   isDragging,
@@ -558,7 +592,8 @@ function PipelineCard({
   stages: Stage[];
   onMove: (stage: string) => void;
   onDelete: () => void;
-  onArchive: () => void;
+  onMarkWon: () => void;
+  onMarkLost: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   isDragging: boolean;
@@ -661,7 +696,7 @@ function PipelineCard({
                   className="w-full px-3 py-1.5 text-sm text-left hover:bg-secondary flex items-center gap-2 text-green-600"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onMove("won");
+                    onMarkWon();
                     setShowMenu(false);
                   }}
                 >
@@ -672,12 +707,12 @@ function PipelineCard({
                   className="w-full px-3 py-1.5 text-sm text-left hover:bg-secondary flex items-center gap-2 text-orange-600"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onArchive();
+                    onMarkLost();
                     setShowMenu(false);
                   }}
                 >
                   <Archive className="h-3 w-3" />
-                  Archive (Not pursuing)
+                  Archive / Didn't Win
                 </button>
 
                 <div className="border-t border-border my-1" />

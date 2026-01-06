@@ -23,6 +23,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import { DashboardTour, useDashboardTour } from "@/components/tours/dashboard-tour";
 import { TodaysFocusCard } from "@/components/dashboard/todays-focus-card";
 import { AIValueCard } from "@/components/dashboard/ai-value-card";
+import { DeadlineCalendar } from "@/components/dashboard/deadline-calendar";
 import { HelpButton } from "@/components/ui/help-button";
 import type { Match } from "@/types";
 
@@ -261,6 +262,11 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Deadline Calendar */}
+      <motion.div variants={item}>
+        <DeadlineCalendar />
+      </motion.div>
 
       {/* Quick Actions */}
       <motion.div variants={item}>

@@ -28,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/services/api-client";
 import { MobileNav } from "@/components/navigation/mobile-nav";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { KeyboardShortcutsModal } from "@/components/ui/keyboard-shortcuts-modal";
 
 interface NavItem {
   href: string;
@@ -64,6 +66,9 @@ export default function DashboardLayout({
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  // Keyboard shortcuts
+  const { showHelp, setShowHelp } = useKeyboardShortcuts();
 
   useEffect(() => {
     // Wait for hydration to complete before doing anything
@@ -442,6 +447,9 @@ export default function DashboardLayout({
 
       {/* Mobile Bottom Navigation */}
       <MobileNav />
+
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
 }
