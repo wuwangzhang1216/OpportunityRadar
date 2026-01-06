@@ -145,7 +145,55 @@ async def get_match_by_batch(
     if not match:
         return None
 
-    return match
+    # Convert to dict and add computed scores from breakdown if not present
+    result = match.model_dump(mode="json")
+
+    # Extract scores from score_breakdown if individual scores are None
+    breakdown = match.score_breakdown or {}
+    factors = breakdown.get("factors", {})
+    eligibility = breakdown.get("eligibility", {})
+
+    # Map factor names to frontend field names
+    # rule_score = compute from eligibility checks (all True = 1.0)
+    if result.get("rule_score") is None:
+        if eligibility:
+            # Count how many eligibility checks pass
+            checks = [eligibility.get("team_size", True), eligibility.get("funding_stage", True), eligibility.get("location", True)]
+            result["rule_score"] = sum(1 for c in checks if c) / len(checks) if checks else 1.0
+        else:
+            result["rule_score"] = 1.0 if breakdown.get("is_eligible", True) else 0.0
+
+    # time_score = deadline factor or use recency_boost as proxy
+    if result.get("time_score") is None:
+        if "deadline" in factors:
+            result["time_score"] = factors["deadline"].get("score", 0)
+        elif "time" in factors:
+            result["time_score"] = factors["time"].get("score", 0)
+        elif "recency_boost" in breakdown:
+            # New format: recency_boost indicates how recent/timely the opportunity is
+            # Scale it up since recency_boost is typically small (0-0.05)
+            # If recency > 0, the opportunity is recent and timely
+            recency = breakdown.get("recency_boost", 0)
+            # Map recency_boost to a reasonable time_score
+            # 0.02+ is recent, give high score; 0 means older
+            result["time_score"] = min(1.0, 0.7 + recency * 10) if recency > 0 else 0.5
+
+    # team_score = goals_alignment, track_record, or derive from semantic similarity
+    if result.get("team_score") is None:
+        if "goals_alignment" in factors:
+            result["team_score"] = factors["goals_alignment"].get("score", 0)
+        elif "track_record" in factors:
+            result["team_score"] = factors["track_record"].get("score", 0)
+        elif "team" in factors:
+            result["team_score"] = factors["team"].get("score", 0)
+        else:
+            # New format doesn't have team_score - derive from semantic score
+            # If semantic match is high, team fit is likely good too
+            semantic = breakdown.get("semantic_score") or match.semantic_score or 0
+            # Use semantic as a proxy for overall fit including team
+            result["team_score"] = semantic * 0.9  # Slightly lower than semantic
+
+    return result
 
 
 @router.post("/calculate")

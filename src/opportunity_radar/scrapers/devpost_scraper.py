@@ -353,7 +353,11 @@ class DevpostScraper(BaseScraper):
             description = None
             desc_elem = soup.select_one("#challenge-description, .challenge-description")
             if desc_elem:
-                description = desc_elem.get_text(separator=" ", strip=True)[:5000]
+                # Use double newline as separator to preserve paragraph structure
+                description = desc_elem.get_text(separator="\n\n", strip=True)[:5000]
+                # Clean up excessive newlines (more than 2 consecutive)
+                import re
+                description = re.sub(r'\n{3,}', '\n\n', description)
 
             # Full rules/requirements text
             rules_text = ""

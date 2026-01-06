@@ -25,12 +25,14 @@ async def update_opportunities_for_source(source: str, max_items: int = None):
     from opportunity_radar.scrapers.hackerone_scraper import HackerOneScraper
     from opportunity_radar.scrapers.grants_gov_scraper import GrantsGovScraper
     from opportunity_radar.scrapers.eu_horizon_scraper import EUHorizonScraper
+    from opportunity_radar.scrapers.devpost_scraper import DevpostScraper
 
     # Map source to scraper
     scraper_map = {
         "hackerone": HackerOneScraper,
         "grants_gov": GrantsGovScraper,
         "eu_horizon": EUHorizonScraper,
+        "devpost": DevpostScraper,
     }
 
     if source not in scraper_map:
@@ -55,6 +57,8 @@ async def update_opportunities_for_source(source: str, max_items: int = None):
             query = {"external_id": {"$regex": "^grants-gov-", "$options": "i"}}
         elif source == "eu_horizon":
             query = {"external_id": {"$regex": "^eu-", "$options": "i"}}
+        elif source == "devpost":
+            query = {"source_url": {"$regex": "devpost\\.com", "$options": "i"}}
 
         opportunities = await Opportunity.find(query).to_list()
 
@@ -96,6 +100,11 @@ async def update_opportunities_for_source(source: str, max_items: int = None):
                     if detailed.tags and len(detailed.tags) > len(opp.technologies or []):
                         update_fields["technologies"] = detailed.tags
 
+                    # Also check tech_stack from Devpost scraper
+                    if hasattr(detailed, "tech_stack") and detailed.tech_stack:
+                        if len(detailed.tech_stack) > len(opp.technologies or []):
+                            update_fields["technologies"] = detailed.tech_stack
+
                     if detailed.total_prize_amount and not opp.total_prize_value:
                         update_fields["total_prize_value"] = detailed.total_prize_amount
 
@@ -104,6 +113,26 @@ async def update_opportunities_for_source(source: str, max_items: int = None):
 
                     if detailed.eligibility_rules and len(detailed.eligibility_rules) > len(opp.requirements or []):
                         update_fields["requirements"] = detailed.eligibility_rules
+
+                    # Team size info
+                    if hasattr(detailed, "team_min") and detailed.team_min and not opp.team_size_min:
+                        update_fields["team_size_min"] = detailed.team_min
+                    if hasattr(detailed, "team_max") and detailed.team_max and not opp.team_size_max:
+                        update_fields["team_size_max"] = detailed.team_max
+
+                    # Host name
+                    if hasattr(detailed, "host_name") and detailed.host_name:
+                        # We could create/link to Host document here, but for now just log
+                        logger.debug(f"  Host: {detailed.host_name}")
+
+                    # Location info
+                    if hasattr(detailed, "location") and detailed.location:
+                        if detailed.location != "Online" and not opp.location_city:
+                            update_fields["location_city"] = detailed.location
+
+                    if hasattr(detailed, "is_online") and detailed.is_online is not None:
+                        if not opp.format:
+                            update_fields["format"] = "online" if detailed.is_online else "in-person"
 
                     if detailed.raw_data:
                         update_fields["raw_data"] = detailed.raw_data
@@ -169,7 +198,7 @@ async def main():
     logger.info("Connected to MongoDB")
 
     # Parse command line arguments
-    sources = sys.argv[1:] if len(sys.argv) > 1 else ["hackerone", "grants_gov", "eu_horizon"]
+    sources = sys.argv[1:] if len(sys.argv) > 1 else ["devpost", "hackerone", "grants_gov", "eu_horizon"]
 
     # Check for max items flag
     max_items = None
