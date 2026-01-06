@@ -204,7 +204,7 @@ export interface Match {
   semantic_score?: number;
   score_breakdown?: Record<string, number>;
   // Eligibility
-  eligibility_status?: "eligible" | "ineligible";
+  eligibility_status?: "eligible" | "ineligible" | "partial";
   eligibility_issues?: string[];
   fix_suggestions?: string[];
   reasons?: string[];  // Legacy alias
@@ -214,6 +214,7 @@ export interface Match {
   // Enriched opportunity data
   opportunity_title?: string;
   opportunity_category?: string;
+  opportunity_type?: string;
   opportunity_description?: string;
   opportunity_url?: string;
   opportunity_prize_pool?: number;

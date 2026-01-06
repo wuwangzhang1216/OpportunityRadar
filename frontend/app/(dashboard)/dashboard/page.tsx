@@ -20,9 +20,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/services/api-client";
 import { formatRelativeTime } from "@/lib/utils";
-import { DashboardTour } from "@/components/tours/dashboard-tour";
+import { DashboardTour, useDashboardTour } from "@/components/tours/dashboard-tour";
 import { TodaysFocusCard } from "@/components/dashboard/todays-focus-card";
 import { AIValueCard } from "@/components/dashboard/ai-value-card";
+import { HelpButton } from "@/components/ui/help-button";
 import type { Match } from "@/types";
 
 const container = {
@@ -41,6 +42,8 @@ const item = {
 };
 
 export default function DashboardPage() {
+  const { startTour } = useDashboardTour();
+
   const { data: matches, isLoading: matchesLoading } = useQuery({
     queryKey: ["topMatches"],
     queryFn: () => apiClient.getTopMatches(5),
@@ -79,16 +82,22 @@ export default function DashboardPage() {
       <DashboardTour />
       {/* Header */}
       <motion.div variants={item} data-tour="welcome">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-12 w-12 bg-primary rounded-2xl flex items-center justify-center">
-            <Sparkles className="h-6 w-6 text-white" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 bg-primary rounded-2xl flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+              <p className="text-muted-foreground">
+                Your personalized hackathon command center
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">
-              Your personalized hackathon command center
-            </p>
-          </div>
+          <HelpButton
+            onTrigger={startTour}
+            tooltipText="Replay tutorial"
+          />
         </div>
       </motion.div>
 
