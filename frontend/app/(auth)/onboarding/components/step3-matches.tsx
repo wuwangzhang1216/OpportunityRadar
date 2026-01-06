@@ -81,7 +81,7 @@ export function Step3Matches() {
                       <div className="flex items-center gap-1 text-yellow-500">
                         <Star className="h-4 w-4 fill-current" />
                         <span className="text-sm font-medium">
-                          {(match.score * 100).toFixed(0)}%
+                          {((match.score ?? match.overall_score ?? 0) * 100).toFixed(0)}%
                         </span>
                       </div>
                     </div>
