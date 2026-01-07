@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDebouncedSearch } from "@/hooks/use-debounce";
 import {
   Search,
   Target,
@@ -50,7 +51,7 @@ const filterOptions = [
 ];
 
 export default function OpportunitiesPage() {
-  const [search, setSearch] = useState("");
+  const { inputValue: search, debouncedValue: debouncedSearch, setInputValue: setSearch, isSearching } = useDebouncedSearch("", 300);
   const [category, setCategory] = useState("");
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(0);
@@ -70,15 +71,19 @@ export default function OpportunitiesPage() {
   });
 
   // Filter by search and category on client side (matches API doesn't support these)
-  const filteredItems = data?.items?.filter((match: Match) => {
-    const matchesSearch = !search ||
-      match.opportunity_title?.toLowerCase().includes(search.toLowerCase()) ||
-      match.opportunity_description?.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = !category ||
-      match.opportunity_category === category ||
-      match.opportunity_type === category;
-    return matchesSearch && matchesCategory;
-  }) || [];
+  // Using debounced search value to prevent excessive filtering on every keystroke
+  const filteredItems = useMemo(() => {
+    if (!data?.items) return [];
+    return data.items.filter((match: Match) => {
+      const matchesSearch = !debouncedSearch ||
+        match.opportunity_title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        match.opportunity_description?.toLowerCase().includes(debouncedSearch.toLowerCase());
+      const matchesCategory = !category ||
+        match.opportunity_category === category ||
+        match.opportunity_type === category;
+      return matchesSearch && matchesCategory;
+    });
+  }, [data?.items, debouncedSearch, category]);
 
   return (
     <div className="space-y-6">
@@ -96,13 +101,23 @@ export default function OpportunitiesPage() {
       <div className="space-y-4">
         <div className="flex gap-4 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors ${isSearching ? "text-primary animate-pulse" : "text-muted-foreground"}`} />
             <Input
               placeholder="Search opportunities..."
-              className="pl-10"
+              className="pl-10 pr-10"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search opportunities"
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <div className="flex gap-2">
             {filterOptions.map((opt) => (

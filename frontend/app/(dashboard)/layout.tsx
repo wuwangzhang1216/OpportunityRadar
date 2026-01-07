@@ -30,6 +30,7 @@ import { MobileNav } from "@/components/navigation/mobile-nav";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { KeyboardShortcutsModal } from "@/components/ui/keyboard-shortcuts-modal";
+import { authLogger } from "@/lib/logger";
 
 interface NavItem {
   href: string;
@@ -130,7 +131,7 @@ export default function DashboardLayout({
       if (authChecked && !isLoading && isAuthenticated && !onboardingChecked) {
         try {
           const status = await apiClient.getOnboardingStatus();
-          console.log("Onboarding status:", status);
+          authLogger.debug("Onboarding status:", status);
           if (!status.onboarding_completed) {
             router.push("/onboarding");
             return; // Don't set onboardingChecked, let the redirect happen
@@ -138,7 +139,7 @@ export default function DashboardLayout({
           setOnboardingChecked(true);
         } catch (error) {
           // If check fails, allow access but log error
-          console.error("Failed to check onboarding status:", error);
+          authLogger.error("Failed to check onboarding status:", error);
           setOnboardingChecked(true);
         }
       }
@@ -178,6 +179,14 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Skip to main content link for accessibility */}
+      <a
+        href="#main-content"
+        className="skip-link sr-only-focusable"
+      >
+        Skip to main content
+      </a>
+
       {/* Desktop Sidebar */}
       <motion.aside
         initial={false}
@@ -424,6 +433,9 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <main
+        id="main-content"
+        role="main"
+        aria-label="Main content"
         className={cn(
           "min-h-screen transition-all duration-300",
           "lg:ml-[280px]",

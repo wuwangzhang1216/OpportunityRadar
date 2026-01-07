@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/services/api-client";
 import { formatRelativeTime } from "@/lib/utils";
 import { VersionHistory, VersionCompare } from "@/components/materials/version-history";
+import { materialsLogger } from "@/lib/logger";
 
 const materialTypeInfo: Record<string, { icon: any; label: string; color: string }> = {
   readme: { icon: FileText, label: "README", color: "bg-primary" },
@@ -160,7 +161,7 @@ function MaterialCard({ material }: { material: any }) {
 
   const handleRestore = (version: any) => {
     // In production, this would call an API to restore the version
-    console.log("Restoring version:", version);
+    materialsLogger.info("Restoring version:", version);
     alert(`Version ${version.version} would be restored. This feature requires backend support.`);
   };
 

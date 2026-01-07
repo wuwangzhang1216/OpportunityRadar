@@ -26,6 +26,7 @@ import Link from "next/link";
 import { Tooltip } from "@/components/ui/tooltip";
 import { HelpCircle } from "lucide-react";
 import { ResultFeedbackModal, ResultFeedback } from "@/components/pipeline/result-feedback-modal";
+import { pipelineLogger } from "@/lib/logger";
 
 interface Stage {
   id: string;
@@ -188,11 +189,11 @@ export default function PipelinePage() {
     queryFn: () => apiClient.getPipelines({ limit: 100 }),
   });
 
-  // Debug logging
-  console.log("Pipeline data:", pipelineData);
-  console.log("Pipeline items:", pipelineData?.items);
-  console.log("isLoading:", isLoading);
-  console.log("error:", error);
+  // Debug logging (only in development)
+  pipelineLogger.debug("Pipeline data:", pipelineData);
+  pipelineLogger.debug("Pipeline items:", pipelineData?.items);
+  pipelineLogger.debug("isLoading:", isLoading);
+  if (error) pipelineLogger.error("Pipeline error:", error);
 
   const moveMutation = useMutation({
     mutationFn: ({
@@ -279,7 +280,7 @@ export default function PipelinePage() {
     await moveMutation.mutateAsync({ pipelineId, stage: targetStage });
 
     // In production, also save the feedback to the backend
-    console.log("Feedback submitted:", { pipelineId, feedback });
+    pipelineLogger.info("Feedback submitted:", { pipelineId, feedback });
 
     // Close modal
     setFeedbackItem(null);

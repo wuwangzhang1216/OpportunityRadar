@@ -24,6 +24,7 @@ import { DashboardTour, useDashboardTour } from "@/components/tours/dashboard-to
 import { TodaysFocusCard } from "@/components/dashboard/todays-focus-card";
 import { AIValueCard } from "@/components/dashboard/ai-value-card";
 import { DeadlineCalendar } from "@/components/dashboard/deadline-calendar";
+import { ProfileCompletionCard } from "@/components/dashboard/profile-completion-card";
 import { HelpButton } from "@/components/ui/help-button";
 import type { Match } from "@/types";
 
@@ -100,6 +101,11 @@ export default function DashboardPage() {
             tooltipText="Replay tutorial"
           />
         </div>
+      </motion.div>
+
+      {/* Profile Completion - Shows if profile is incomplete */}
+      <motion.div variants={item}>
+        <ProfileCompletionCard />
       </motion.div>
 
       {/* AI Assistant Recommendations - Hero Section */}
