@@ -35,7 +35,7 @@ The landing page showcases OpportunityRadar's value proposition:
 
 ### 2. Signup Flow
 
-![Signup Page](screenshots/02_signup.png)
+![Signup Flow](gifs/01_signup_flow.gif)
 
 Registration form with:
 - Full Name
@@ -50,9 +50,20 @@ Registration form with:
 
 ---
 
-### 3. Dashboard
+### 3. Onboarding Flow
 
-![Dashboard](screenshots/03_dashboard.png)
+![Onboarding Flow](gifs/02_onboarding_flow.gif)
+
+3-step onboarding process:
+1. **Profile Type** - Select your role (Developer, Student, etc.)
+2. **URL Extraction** - AI extracts skills from your portfolio/GitHub
+3. **Goals & Availability** - Set your preferences
+
+---
+
+### 4. Dashboard
+
+![Dashboard](gifs/03_dashboard_overview.gif)
 
 The personalized command center includes:
 
@@ -69,9 +80,9 @@ The personalized command center includes:
 
 ---
 
-### 4. Opportunities Page
+### 5. Opportunities Page
 
-![Opportunities List](screenshots/04_opportunities.png)
+![Opportunities Search & Filter](gifs/04_opportunities_search_filter.gif)
 
 Browse and filter matched opportunities:
 
@@ -90,31 +101,9 @@ Browse and filter matched opportunities:
 
 ---
 
-### 5. Opportunity Details
-
-![Opportunity Details](screenshots/05_opportunity_details.png)
-
-Detailed view with comprehensive matching analysis:
-
-**Match Score Breakdown (4 Dimensions):**
-| Dimension | Score | Description |
-|-----------|-------|-------------|
-| Relevance | 82% | Semantic match to your profile |
-| Eligibility | 100% | Requirements you meet |
-| Timeline | 90% | Schedule compatibility |
-| Team Fit | 74% | Team size alignment |
-
-**Actions:**
-- Bookmark / Dismiss
-- Add to Pipeline
-- Generate Materials
-- Add to Calendar (Google, Outlook, iCal)
-
----
-
 ### 6. Pipeline Management
 
-![Pipeline](screenshots/06_pipeline.png)
+![Pipeline Stage Transition](gifs/05_pipeline_stage_transition.gif)
 
 Kanban-style opportunity tracking:
 
@@ -135,7 +124,7 @@ Kanban-style opportunity tracking:
 
 ### 7. AI Material Generator
 
-![AI Generator](screenshots/07_generator.png)
+![AI Generator](gifs/06_ai_generator_material.gif)
 
 Generate winning hackathon materials with AI:
 
@@ -157,24 +146,9 @@ Generate winning hackathon materials with AI:
 
 ---
 
-### 8. My Materials
+### 8. Profile Settings
 
-![Materials](screenshots/08_materials.png)
-
-Manage generated materials:
-- View all AI-generated content
-- Version history with comparison
-- Copy to clipboard
-- Delete unwanted materials
-- Generate new materials
-
-**Empty State:** Prompts user to generate first materials.
-
----
-
-### 9. Profile Settings
-
-![Profile](screenshots/09_profile.png)
+![Profile](gifs/08_profile.gif)
 
 Customize your matching profile:
 
@@ -187,9 +161,9 @@ Customize your matching profile:
 
 ---
 
-### 10. Settings
+### 9. Settings
 
-![Settings](screenshots/10_settings.png)
+![Settings](gifs/09_settings.gif)
 
 Account and app settings:
 
@@ -202,39 +176,12 @@ Account and app settings:
 
 ---
 
-## GIF Recordings
+## Assets
 
-The following GIF animations demonstrate key interactions:
+All demo assets are organized in dedicated folders:
 
-| GIF File | Size | Frames | Description |
-|----------|------|--------|-------------|
-| `01_signup_flow.gif` | 3604KB | 20 | Landing page → Signup form → Account creation |
-| `02_onboarding_flow.gif` | 3623KB | 15 | 3-step onboarding with URL extraction (100% quality) |
-| `03_dashboard_overview.gif` | 501KB | 3 | Dashboard overview with stats and AI assistant |
-| `04_opportunities_search_filter.gif` | 2688KB | 11 | Search "AI" → Filter Hackathons → View Details |
-| `05_pipeline_stage_transition.gif` | 655KB | 5 | Kanban drag-drop from Discovered to Preparing |
-| `06_ai_generator_material.gif` | 2171KB | 11 | Fill form → Generate README with AI |
-| `08_profile.gif` | 168KB | 1 | Profile page with all settings sections |
-| `09_settings.gif` | 176KB | 1 | Settings page with connected accounts and tours |
-
-### Screenshots
-
-| Screenshot File | Description |
-|-----------------|-------------|
-| `01_landing_page.png` | Landing page with hero and features |
-| `02_login_page.png` | Login/Signup page |
-| `03_dashboard.png` | Dashboard with AI assistant and stats |
-| `04_opportunities.png` | Opportunities list with filters |
-| `05_pipeline.png` | Pipeline Kanban board |
-| `06_ai_generator.png` | AI Material Generator form |
-| `07_materials.png` | My Materials page |
-| `08_profile.png` | Profile settings page |
-| `09_settings.png` | Settings page |
-
-### Recording Notes
-- All files are downloaded to Chrome's default Downloads folder
-- Move screenshots to `demo/screenshots/` and GIFs to `demo/gifs/` for organization
-- Recordings show actual user interactions with real-time AI responses
+- **`gifs/`** - Animated GIF recordings of key interactions (embedded in sections above)
+- **`screenshots/`** - Static PNG screenshots extracted from GIFs
 
 ---
 
@@ -288,16 +235,17 @@ The following GIF animations demonstrate key interactions:
 
 ### What Was Demonstrated
 
-| Act | Feature | Recording Type |
-|-----|---------|----------------|
-| 1 | Landing Page & Signup | GIF + Screenshots |
-| 2 | 3-Step Onboarding | GIF (URL extraction: doxmind.com) |
-| 3 | Dashboard Overview | Screenshots (Profile 15%, Stats, AI Assistant) |
-| 4 | Opportunities | GIF (Search "AI", Filter Hackathons, Details) |
-| 5 | Pipeline Kanban | GIF (Stage transition: Discovered → Preparing) |
-| 6 | AI Generator | GIF (README generation for DoxMind project) |
-| 7 | My Materials | Screenshots (Expanded README view) |
-| 8 | Profile & Settings | Screenshots (All sections) |
+| Section | Feature | GIF |
+|---------|---------|-----|
+| 1 | Landing Page | Screenshot |
+| 2 | Signup Flow | `01_signup_flow.gif` |
+| 3 | Onboarding | `02_onboarding_flow.gif` |
+| 4 | Dashboard | `03_dashboard_overview.gif` |
+| 5 | Opportunities | `04_opportunities_search_filter.gif` |
+| 6 | Pipeline | `05_pipeline_stage_transition.gif` |
+| 7 | AI Generator | `06_ai_generator_material.gif` |
+| 8 | Profile | `08_profile.gif` |
+| 9 | Settings | `09_settings.gif` |
 
 ### Key Highlights Captured
 
