@@ -1,0 +1,2026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpportunityRadar - Pitch Deck</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black: #000000;
+            --white: #ffffff;
+            --gray-50: #fafafa;
+            --gray-100: #f4f4f5;
+            --gray-200: #e4e4e7;
+            --gray-300: #d4d4d8;
+            --gray-400: #a1a1aa;
+            --gray-500: #71717a;
+            --gray-600: #52525b;
+            --gray-700: #3f3f46;
+            --gray-800: #27272a;
+            --gray-900: #18181b;
+            --gray-950: #09090b;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Aceternity-style Grid Background */
+        .grid-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .grid-background::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at center, transparent 0%, var(--black) 70%);
+        }
+
+        /* Spotlight Effect */
+        .spotlight {
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
+                rgba(255,255,255,0.06) 0%, 
+                transparent 25%);
+            pointer-events: none;
+            z-index: 2;
+            transition: background 0.3s ease;
+        }
+
+        .presentation {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            z-index: 10;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 100px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px);
+            transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        /* Aceternity Glow Text */
+        .glow-text {
+            background: linear-gradient(180deg, var(--white) 0%, var(--gray-400) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .shimmer-text {
+            background: linear-gradient(
+                90deg,
+                var(--gray-400) 0%,
+                var(--white) 25%,
+                var(--gray-400) 50%,
+                var(--white) 75%,
+                var(--gray-400) 100%
+            );
+            background-size: 200% 100%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 3s linear infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 80px;
+            font-weight: 700;
+            letter-spacing: -2px;
+            line-height: 1;
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 56px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            line-height: 1.1;
+            margin-bottom: 50px;
+        }
+
+        h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        p {
+            font-size: 16px;
+            line-height: 1.7;
+            color: var(--gray-400);
+            font-weight: 400;
+        }
+
+        /* Aceternity Badge */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 100px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray-300);
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+        }
+
+        .badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        /* Glassmorphism Card */
+        .glass-card {
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 24px;
+            padding: 32px;
+            position: relative;
+            overflow: visible;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            border-radius: 24px 24px 0 0;
+        }
+
+        .glass-card:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.15);
+            transform: translateY(-4px);
+        }
+
+        /* Moving Border Effect */
+        .moving-border {
+            position: relative;
+            border-radius: 24px;
+            padding: 2px;
+            background: linear-gradient(90deg, var(--gray-800), var(--gray-700), var(--gray-800));
+            background-size: 200% 100%;
+            animation: borderMove 3s linear infinite;
+        }
+
+        .moving-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 24px;
+            padding: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            background-size: 200% 100%;
+            animation: borderMove 3s linear infinite;
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+
+        @keyframes borderMove {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .moving-border-inner {
+            background: var(--gray-950);
+            border-radius: 22px;
+            padding: 32px;
+        }
+
+        /* Slide 1 - Opening */
+        .slide-opening {
+            text-align: center;
+        }
+
+        .slide-opening h1 {
+            font-size: 100px;
+            margin-bottom: 24px;
+        }
+
+        .tagline-container {
+            display: flex;
+            gap: 16px;
+            margin-top: 40px;
+        }
+
+        .tagline-item {
+            padding: 16px 32px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+
+        .tagline-item:hover {
+            background: var(--white);
+            color: var(--black);
+            transform: scale(1.05);
+        }
+
+        .team-badge-bottom {
+            position: absolute;
+            bottom: 60px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--gray-500);
+        }
+
+        .team-badge-bottom span {
+            width: 1px;
+            height: 16px;
+            background: var(--gray-700);
+        }
+
+        /* Slide 2 - Problem */
+        .slide-problem {
+            background: var(--white);
+        }
+
+        .slide-problem .grid-background {
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+        }
+
+        .slide-problem .grid-background::before {
+            background: radial-gradient(ellipse at center, transparent 0%, var(--white) 70%);
+        }
+
+        .slide-problem h2,
+        .slide-problem h3 {
+            color: var(--black);
+        }
+
+        .slide-problem p {
+            color: var(--gray-600);
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 60px;
+            margin-bottom: 50px;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 40px;
+            background: var(--gray-50);
+            border-radius: 24px;
+            border: 1px solid var(--gray-200);
+            min-width: 200px;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 72px;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--black);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--gray-500);
+            margin-top: 12px;
+            font-weight: 500;
+        }
+
+        .problem-quote {
+            max-width: 700px;
+            padding: 32px 40px;
+            background: var(--black);
+            color: var(--white);
+            border-radius: 16px;
+            font-size: 18px;
+            line-height: 1.7;
+            position: relative;
+        }
+
+        .problem-quote::before {
+            content: '"';
+            position: absolute;
+            top: 16px;
+            left: 24px;
+            font-size: 48px;
+            color: var(--gray-600);
+            font-family: Georgia, serif;
+        }
+
+        /* Slide 3 - Solution */
+        .solution-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            max-width: 1000px;
+        }
+
+        .solution-card {
+            position: relative;
+        }
+
+        .solution-card .number {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: var(--white);
+            color: var(--black);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 13px;
+            z-index: 1;
+        }
+
+        .solution-card h3 {
+            color: var(--white);
+        }
+
+        .solution-card p {
+            font-size: 15px;
+        }
+
+        /* SVG Icon container */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            margin-top: 24px;
+        }
+
+        .feature-icon svg {
+            width: 24px;
+            height: 24px;
+            stroke: var(--white);
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        /* Slide 4 - Traction */
+        .traction-content {
+            display: flex;
+            gap: 80px;
+            align-items: center;
+        }
+
+        .chart-container {
+            width: 400px;
+            height: 300px;
+            position: relative;
+        }
+
+        .metrics-list {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .metric-item {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .metric-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 56px;
+            font-weight: 700;
+            min-width: 180px;
+        }
+
+        .metric-info h4 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .metric-info p {
+            font-size: 14px;
+            color: var(--gray-500);
+        }
+
+        .improvement-banner {
+            margin-top: 50px;
+            padding: 24px 48px;
+            background: linear-gradient(90deg, rgba(34,197,94,0.1), rgba(34,197,94,0.05));
+            border: 1px solid rgba(34,197,94,0.3);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .improvement-banner .big-number {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            color: #22c55e;
+        }
+
+        /* Slide 5 - Business Model */
+        .slide-business {
+            background: var(--white);
+        }
+
+        .slide-business h2 {
+            color: var(--black);
+        }
+
+        .pricing-container {
+            display: flex;
+            gap: 24px;
+            align-items: stretch;
+        }
+
+        .pricing-card {
+            width: 240px;
+            padding: 32px 24px;
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 24px;
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-8px);
+        }
+
+        .pricing-card.featured {
+            background: var(--black);
+            color: var(--white);
+            transform: scale(1.05);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+        }
+
+        .pricing-card.featured:hover {
+            transform: scale(1.05) translateY(-8px);
+        }
+
+        .pricing-card .tier {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--gray-500);
+            margin-bottom: 16px;
+        }
+
+        .pricing-card.featured .tier {
+            color: var(--gray-400);
+        }
+
+        .pricing-card .price {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--black);
+        }
+
+        .pricing-card.featured .price {
+            color: var(--white);
+        }
+
+        .pricing-card .period {
+            font-size: 14px;
+            color: var(--gray-500);
+        }
+
+        .pricing-card .features {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--gray-200);
+            font-size: 14px;
+            line-height: 2.2;
+            color: var(--gray-600);
+        }
+
+        .pricing-card.featured .features {
+            border-color: var(--gray-700);
+            color: var(--gray-400);
+        }
+
+        /* Slide 6 - Market */
+        .market-content {
+            display: flex;
+            gap: 100px;
+            align-items: center;
+        }
+
+        .market-chart {
+            width: 350px;
+            height: 350px;
+        }
+
+        .market-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+
+        .market-stat {
+            position: relative;
+            padding-left: 20px;
+            border-left: 3px solid var(--white);
+        }
+
+        .market-stat .value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+        }
+
+        .market-stat .label {
+            font-size: 15px;
+            color: var(--gray-400);
+            margin-top: 4px;
+        }
+
+        .market-tagline {
+            margin-top: 60px;
+            text-align: center;
+        }
+
+        .market-tagline span {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px;
+            font-weight: 600;
+            padding-bottom: 4px;
+            border-bottom: 3px solid var(--white);
+        }
+
+        /* Slide 7 - Team */
+        .slide-team {
+            background: var(--white);
+        }
+
+        .slide-team h2 {
+            color: var(--black);
+        }
+
+        .universities-container {
+            display: flex;
+            gap: 32px;
+            margin-bottom: 50px;
+        }
+
+        .university-badge {
+            padding: 20px 40px;
+            border: 2px solid var(--black);
+            border-radius: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--black);
+            transition: all 0.3s ease;
+        }
+
+        .university-badge:hover {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .team-description {
+            max-width: 600px;
+            text-align: center;
+            font-size: 18px;
+            color: var(--gray-600);
+            margin-bottom: 50px;
+        }
+
+        .skills-container {
+            display: flex;
+            gap: 24px;
+        }
+
+        .skill-card {
+            width: 200px;
+            padding: 32px 24px;
+            background: var(--black);
+            border-radius: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .skill-card:hover {
+            transform: translateY(-8px);
+        }
+
+        .skill-card h4 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--white);
+            margin-bottom: 8px;
+        }
+
+        .skill-card p {
+            font-size: 13px;
+            color: var(--gray-400);
+        }
+
+        /* Slide 8 - Closing */
+        .slide-closing {
+            text-align: center;
+        }
+
+        .slide-closing h1 {
+            font-size: 72px;
+            margin-bottom: 60px;
+            line-height: 1.1;
+        }
+
+        .cta-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 60px;
+        }
+
+        .cta-button {
+            padding: 20px 48px;
+            background: transparent;
+            border: 2px solid var(--white);
+            border-radius: 12px;
+            color: var(--white);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: var(--white);
+            transition: all 0.3s ease;
+            z-index: -1;
+        }
+
+        .cta-button:hover {
+            color: var(--black);
+        }
+
+        .cta-button:hover::before {
+            left: 0;
+        }
+
+        .thank-you {
+            font-size: 14px;
+            color: var(--gray-500);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        /* Navigation */
+        .nav-container {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            z-index: 100;
+            padding: 12px 24px;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 100px;
+        }
+
+        .nav-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--gray-600);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-dot.active {
+            background: var(--white);
+            width: 24px;
+            border-radius: 4px;
+        }
+
+        .nav-arrow {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: var(--white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            font-size: 16px;
+        }
+
+        .nav-arrow:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .slide-counter {
+            font-size: 12px;
+            color: var(--gray-400);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--white), var(--gray-400));
+            z-index: 100;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Floating particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            animation: float 20s infinite;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+            h1 { font-size: 64px; }
+            h2 { font-size: 42px; }
+            .slide { padding: 40px 60px; }
+        }
+
+        /* Stagger animations for cards */
+        .glass-card, .stat-card, .pricing-card, .skill-card {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .slide.active .glass-card,
+        .slide.active .stat-card,
+        .slide.active .pricing-card,
+        .slide.active .skill-card {
+            animation: cardReveal 0.6s ease forwards;
+        }
+
+        .slide.active .glass-card:nth-child(1),
+        .slide.active .stat-card:nth-child(1),
+        .slide.active .pricing-card:nth-child(1),
+        .slide.active .skill-card:nth-child(1) { animation-delay: 0.1s; }
+
+        .slide.active .glass-card:nth-child(2),
+        .slide.active .stat-card:nth-child(2),
+        .slide.active .pricing-card:nth-child(2),
+        .slide.active .skill-card:nth-child(2) { animation-delay: 0.2s; }
+
+        .slide.active .glass-card:nth-child(3),
+        .slide.active .stat-card:nth-child(3),
+        .slide.active .pricing-card:nth-child(3),
+        .slide.active .skill-card:nth-child(3) { animation-delay: 0.3s; }
+
+        .slide.active .glass-card:nth-child(4),
+        .slide.active .stat-card:nth-child(4),
+        .slide.active .pricing-card:nth-child(4) { animation-delay: 0.4s; }
+
+        @keyframes cardReveal {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Counter animation */
+        .count-up {
+            display: inline-block;
+        }
+
+        /* Architecture Slide Styles - Enhanced */
+        .slide-architecture {
+            padding: 30px 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .arch-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .arch-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: linear-gradient(135deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05));
+            border: 1px solid rgba(34,197,94,0.3);
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #22c55e;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .arch-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .slide-architecture h2 {
+            margin-bottom: 8px;
+            font-size: 42px;
+        }
+
+        .arch-subtitle {
+            font-size: 14px;
+            color: var(--gray-400);
+            font-weight: 400;
+        }
+
+        .architecture-container {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .architecture-diagram {
+            width: 100%;
+            max-width: 1200px;
+            height: auto;
+        }
+
+        /* Flow path animations */
+        .flow-path {
+            stroke-dasharray: 8 4;
+            animation: flowDash 2s linear infinite;
+        }
+
+        @keyframes flowDash {
+            0% { stroke-dashoffset: 24; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        /* Architecture node hover */
+        .arch-node {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: default;
+        }
+
+        .arch-node:hover {
+            filter: brightness(1.1);
+        }
+
+        .arch-node:hover rect:first-child {
+            filter: brightness(1.2);
+        }
+
+        /* Enhanced Stats */
+        .arch-stats-enhanced {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .arch-stat-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .arch-stat-card:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.15);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .arch-stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .arch-stat-number {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--white);
+            line-height: 1;
+        }
+
+        .arch-stat-text {
+            font-size: 11px;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .arch-stat-card:nth-child(1):hover { border-color: rgba(34,197,94,0.4); }
+        .arch-stat-card:nth-child(2):hover { border-color: rgba(59,130,246,0.4); }
+        .arch-stat-card:nth-child(3):hover { border-color: rgba(168,85,247,0.4); }
+        .arch-stat-card:nth-child(4):hover { border-color: rgba(236,72,153,0.4); }
+        .arch-stat-card:nth-child(5):hover { border-color: rgba(251,191,36,0.4); }
+    </style>
+</head>
+<body>
+    <div class="grid-background"></div>
+    <div class="spotlight" id="spotlight"></div>
+    <div class="particles" id="particles"></div>
+    <div class="progress-bar" id="progress"></div>
+
+    <div class="presentation">
+        <!-- Slide 1: Opening -->
+        <div class="slide slide-opening active" data-slide="1">
+            <div class="badge">Now in Beta</div>
+            <h1 class="glow-text">OpportunityRadar</h1>
+            <p style="font-size: 20px; color: var(--gray-400); max-width: 500px; text-align: center; margin-bottom: 20px;">
+                AI-powered platform that helps developers discover, match, and win growth-accelerating opportunities.
+            </p>
+            <div class="tagline-container">
+                <div class="tagline-item">Discover</div>
+                <div class="tagline-item">Match</div>
+                <div class="tagline-item">Win</div>
+            </div>
+            <div class="team-badge-bottom">
+                <span></span>
+                WAXIS
+                <span></span>
+                Cornell University & University of Toronto
+                <span></span>
+            </div>
+        </div>
+
+        <!-- Slide 2: Problem -->
+        <div class="slide slide-problem" data-slide="2">
+            <h2 class="glow-text" style="background: linear-gradient(180deg, #000 0%, #666 100%); -webkit-background-clip: text;">The Problem</h2>
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-number"><span class="count-up" data-target="10">0</span>+</div>
+                    <div class="stat-label">Hours/Week Searching</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number"><span class="count-up" data-target="40">0</span>+</div>
+                    <div class="stat-label">Hours Preparing</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number"><span class="count-up" data-target="70">0</span>%</div>
+                    <div class="stat-label">Never Apply</div>
+                </div>
+            </div>
+            <div class="problem-quote">
+                Most developers miss out — not because they're not talented, but because finding the RIGHT opportunity is like finding a needle in a haystack.
+            </div>
+        </div>
+
+        <!-- Slide 3: Solution -->
+        <div class="slide slide-solution" data-slide="3">
+            <h2 class="glow-text">Our Solution</h2>
+            <div class="solution-grid">
+                <div class="solution-card glass-card">
+                    <div class="number">1</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="M21 21l-4.35-4.35"></path>
+                        </svg>
+                    </div>
+                    <h3>Smart Discovery</h3>
+                    <p>Aggregate 500+ sources — Devpost, MLH, Kaggle, NSERC, IRAP — all in one place with real-time updates.</p>
+                </div>
+                <div class="solution-card glass-card">
+                    <div class="number">2</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <circle cx="12" cy="12" r="6"></circle>
+                            <circle cx="12" cy="12" r="2"></circle>
+                        </svg>
+                    </div>
+                    <h3>Intelligent Matching</h3>
+                    <p>AI analyzes your profile and scores opportunities across relevance, eligibility, timeline, and team fit.</p>
+                </div>
+                <div class="solution-card glass-card">
+                    <div class="number">3</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                    </div>
+                    <h3>AI Material Generation</h3>
+                    <p>One-click READMEs, pitch scripts, demo guides, and Q&A prep tailored to judging criteria.</p>
+                </div>
+                <div class="solution-card glass-card">
+                    <div class="number">4</div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                        </svg>
+                    </div>
+                    <h3>Pipeline Tracking</h3>
+                    <p>Kanban management from discovery to submission. Calendar integration ensures zero missed deadlines.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: Traction -->
+        <div class="slide slide-traction" data-slide="4">
+            <h2 class="glow-text">Traction & Validation</h2>
+            <div class="traction-content">
+                <div class="chart-container">
+                    <canvas id="tractionChart"></canvas>
+                </div>
+                <div class="metrics-list">
+                    <div class="metric-item">
+                        <div class="metric-value shimmer-text">1,000+</div>
+                        <div class="metric-info">
+                            <h4>Active Opportunities</h4>
+                            <p>Aggregated from 15+ platforms</p>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value shimmer-text">100%</div>
+                        <div class="metric-info">
+                            <h4>Profile Quality Score</h4>
+                            <p>AI extraction accuracy</p>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value shimmer-text">86%</div>
+                        <div class="metric-info">
+                            <h4>Matching Relevance</h4>
+                            <p>User satisfaction rate</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="improvement-banner">
+                <div class="big-number">5×</div>
+                <div>
+                    <h4 style="font-size: 18px; font-weight: 600;">Preparation Time Reduction</h4>
+                    <p>From 40 hours to under 8 hours</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5: Business Model -->
+        <div class="slide slide-business" data-slide="5">
+            <h2 style="background: linear-gradient(180deg, #000 0%, #666 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Business Model</h2>
+            <div class="pricing-container">
+                <div class="pricing-card">
+                    <div class="tier">Free</div>
+                    <div class="price">$0</div>
+                    <div class="period">Forever</div>
+                    <div class="features">
+                        3 matches/week<br>
+                        Basic discovery<br>
+                        Community access
+                    </div>
+                </div>
+                <div class="pricing-card featured">
+                    <div class="tier">Pro</div>
+                    <div class="price">$19</div>
+                    <div class="period">/month</div>
+                    <div class="features">
+                        Unlimited matching<br>
+                        AI generation<br>
+                        Deadline alerts<br>
+                        Suggestions
+                    </div>
+                </div>
+                <div class="pricing-card">
+                    <div class="tier">Team</div>
+                    <div class="price">$49</div>
+                    <div class="period">/month</div>
+                    <div class="features">
+                        Multi-user<br>
+                        Shared pipelines<br>
+                        Team matching<br>
+                        Analytics
+                    </div>
+                </div>
+                <div class="pricing-card">
+                    <div class="tier">Enterprise</div>
+                    <div class="price">Custom</div>
+                    <div class="period">Contact us</div>
+                    <div class="features">
+                        White-label<br>
+                        Universities<br>
+                        Accelerators<br>
+                        API access
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: Market -->
+        <div class="slide slide-market" data-slide="6">
+            <h2 class="glow-text">Market Opportunity</h2>
+            <div class="market-content">
+                <div class="market-chart">
+                    <canvas id="marketChart"></canvas>
+                </div>
+                <div class="market-stats">
+                    <div class="market-stat">
+                        <div class="value">$50B+</div>
+                        <div class="label">Global grants annually</div>
+                    </div>
+                    <div class="market-stat">
+                        <div class="value">50M+</div>
+                        <div class="label">Developers worldwide</div>
+                    </div>
+                    <div class="market-stat">
+                        <div class="value">10K+</div>
+                        <div class="label">Hackathons per year</div>
+                    </div>
+                    <div class="market-stat">
+                        <div class="value">0</div>
+                        <div class="label">Unified platforms</div>
+                    </div>
+                </div>
+            </div>
+            <div class="market-tagline">
+                <span>Building the LinkedIn for Opportunities</span>
+            </div>
+        </div>
+
+        <!-- Slide 7: Architecture -->
+        <div class="slide slide-architecture" data-slide="7">
+            <div class="arch-header">
+                <div class="arch-badge">Production Ready</div>
+                <h2 class="glow-text">Technical Architecture</h2>
+                <p class="arch-subtitle">Event-driven microservices with AI-powered semantic matching</p>
+            </div>
+
+            <div class="architecture-container">
+                <svg class="architecture-diagram" viewBox="0 0 1200 520" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <!-- Advanced Gradients -->
+                        <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:rgba(15,15,20,1)"/>
+                            <stop offset="100%" style="stop-color:rgba(10,10,15,1)"/>
+                        </linearGradient>
+                        <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:rgba(255,255,255,0.06)"/>
+                            <stop offset="100%" style="stop-color:rgba(255,255,255,0.01)"/>
+                        </linearGradient>
+                        <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#3b82f6"/>
+                            <stop offset="50%" style="stop-color:#8b5cf6"/>
+                            <stop offset="100%" style="stop-color:#ec4899"/>
+                        </linearGradient>
+                        <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#10b981"/>
+                            <stop offset="100%" style="stop-color:#22c55e"/>
+                        </linearGradient>
+                        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#3b82f6"/>
+                            <stop offset="100%" style="stop-color:#60a5fa"/>
+                        </linearGradient>
+                        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#8b5cf6"/>
+                            <stop offset="100%" style="stop-color:#a78bfa"/>
+                        </linearGradient>
+                        <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:rgba(59,130,246,0)"/>
+                            <stop offset="50%" style="stop-color:rgba(59,130,246,0.6)"/>
+                            <stop offset="100%" style="stop-color:rgba(59,130,246,0)"/>
+                        </linearGradient>
+
+                        <!-- Filters -->
+                        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                        <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+                            <feGaussianBlur stdDeviation="2" result="blur"/>
+                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                        <filter id="innerGlow" x="-10%" y="-10%" width="120%" height="120%">
+                            <feGaussianBlur stdDeviation="1.5" result="blur"/>
+                            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                        </filter>
+
+                        <!-- Patterns -->
+                        <pattern id="dotPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                            <circle cx="1" cy="1" r="0.5" fill="rgba(255,255,255,0.08)"/>
+                        </pattern>
+
+                        <!-- Arrow Marker -->
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="rgba(59,130,246,0.6)"/>
+                        </marker>
+                        <marker id="arrowheadGreen" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="rgba(34,197,94,0.6)"/>
+                        </marker>
+                    </defs>
+
+                    <!-- Background -->
+                    <rect width="100%" height="100%" fill="url(#dotPattern)" opacity="0.5"/>
+
+                    <!-- Connection Lines with Animation -->
+                    <g class="connections">
+                        <!-- Ingestion to Core -->
+                        <path d="M 205 140 C 260 140, 280 200, 340 200" fill="none" stroke="url(#flowGrad)" stroke-width="2" class="flow-path" marker-end="url(#arrowhead)"/>
+                        <path d="M 205 220 L 340 220" fill="none" stroke="url(#flowGrad)" stroke-width="2" class="flow-path" style="animation-delay:0.3s" marker-end="url(#arrowhead)"/>
+                        <path d="M 205 300 C 260 300, 280 240, 340 240" fill="none" stroke="url(#flowGrad)" stroke-width="2" class="flow-path" style="animation-delay:0.6s" marker-end="url(#arrowhead)"/>
+
+                        <!-- Core to Data -->
+                        <path d="M 560 160 L 640 100" fill="none" stroke="rgba(34,197,94,0.4)" stroke-width="2" class="flow-path" style="animation-delay:0.9s" marker-end="url(#arrowheadGreen)"/>
+                        <path d="M 560 220 L 640 220" fill="none" stroke="rgba(59,130,246,0.4)" stroke-width="2" class="flow-path" style="animation-delay:1.2s" marker-end="url(#arrowhead)"/>
+                        <path d="M 560 280 L 640 340" fill="none" stroke="rgba(239,68,68,0.4)" stroke-width="2" class="flow-path" style="animation-delay:1.5s"/>
+
+                        <!-- Data to AI -->
+                        <path d="M 800 220 L 870 220" fill="none" stroke="url(#purpleGrad)" stroke-width="2" class="flow-path" style="animation-delay:1.8s" marker-end="url(#arrowhead)"/>
+
+                        <!-- Core to Frontend -->
+                        <path d="M 560 220 C 700 220, 750 400, 870 400" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-dasharray="6,4" class="flow-path" style="animation-delay:2.1s"/>
+                    </g>
+
+                    <!-- Layer 1: Data Ingestion -->
+                    <g transform="translate(20, 60)">
+                        <!-- Section Header -->
+                        <g transform="translate(0, 0)">
+                            <rect x="0" y="0" width="185" height="24" rx="12" fill="rgba(34,197,94,0.15)" stroke="rgba(34,197,94,0.3)" stroke-width="1"/>
+                            <circle cx="16" cy="12" r="4" fill="#22c55e"/>
+                            <text x="28" y="16" fill="#22c55e" font-size="10" font-weight="600" letter-spacing="1">DATA INGESTION</text>
+                        </g>
+
+                        <!-- Scraper Cards -->
+                        <g transform="translate(0, 40)" class="arch-node">
+                            <rect x="0" y="0" width="185" height="55" rx="10" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                            <rect x="0" y="0" width="185" height="55" rx="10" fill="none" stroke="url(#greenGrad)" stroke-width="1" opacity="0.3"/>
+                            <g transform="translate(12, 12)">
+                                <rect x="0" y="0" width="32" height="32" rx="8" fill="rgba(34,197,94,0.15)"/>
+                                <path d="M16 8 L16 24 M8 16 L24 16" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+                            </g>
+                            <text x="54" y="24" fill="white" font-size="12" font-weight="600">11 Platform Scrapers</text>
+                            <text x="54" y="40" fill="rgba(255,255,255,0.5)" font-size="10">Playwright + BeautifulSoup</text>
+                        </g>
+
+                        <g transform="translate(0, 105)" class="arch-node">
+                            <rect x="0" y="0" width="185" height="55" rx="10" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                            <g transform="translate(12, 12)">
+                                <rect x="0" y="0" width="32" height="32" rx="8" fill="rgba(251,191,36,0.15)"/>
+                                <circle cx="16" cy="16" r="8" stroke="#fbbf24" stroke-width="2" fill="none"/>
+                                <path d="M16 12 L16 16 L19 19" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                            </g>
+                            <text x="54" y="24" fill="white" font-size="12" font-weight="600">APScheduler</text>
+                            <text x="54" y="40" fill="rgba(255,255,255,0.5)" font-size="10">Cron-based orchestration</text>
+                        </g>
+
+                        <g transform="translate(0, 170)" class="arch-node">
+                            <rect x="0" y="0" width="185" height="55" rx="10" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                            <g transform="translate(12, 12)">
+                                <rect x="0" y="0" width="32" height="32" rx="8" fill="rgba(59,130,246,0.15)"/>
+                                <path d="M10 20 L16 14 L22 20 L16 26 Z" stroke="#3b82f6" stroke-width="2" fill="none"/>
+                            </g>
+                            <text x="54" y="24" fill="white" font-size="12" font-weight="600">Data Normalizer</text>
+                            <text x="54" y="40" fill="rgba(255,255,255,0.5)" font-size="10">Schema validation</text>
+                        </g>
+                    </g>
+
+                    <!-- Layer 2: Core Services -->
+                    <g transform="translate(340, 40)">
+                        <g transform="translate(0, 0)">
+                            <rect x="0" y="0" width="220" height="24" rx="12" fill="rgba(59,130,246,0.15)" stroke="rgba(59,130,246,0.3)" stroke-width="1"/>
+                            <circle cx="16" cy="12" r="4" fill="#3b82f6"/>
+                            <text x="28" y="16" fill="#3b82f6" font-size="10" font-weight="600" letter-spacing="1">CORE SERVICES</text>
+                        </g>
+
+                        <!-- Main Service Box -->
+                        <g transform="translate(0, 35)">
+                            <rect x="0" y="0" width="220" height="280" rx="14" fill="url(#cardGrad)" stroke="rgba(59,130,246,0.2)" stroke-width="1.5"/>
+
+                            <!-- FastAPI Header -->
+                            <rect x="0" y="0" width="220" height="50" rx="14" fill="rgba(34,197,94,0.08)"/>
+                            <g transform="translate(15, 12)">
+                                <rect x="0" y="0" width="28" height="28" rx="6" fill="rgba(34,197,94,0.2)" stroke="#22c55e" stroke-width="1"/>
+                                <text x="14" y="19" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">F</text>
+                            </g>
+                            <text x="55" y="22" fill="white" font-size="13" font-weight="600">FastAPI</text>
+                            <text x="55" y="38" fill="rgba(255,255,255,0.4)" font-size="9">Async Python Backend</text>
+                            <text x="180" y="30" fill="rgba(34,197,94,0.6)" font-size="9" text-anchor="middle">v0.109+</text>
+
+                            <!-- Service Items -->
+                            <g transform="translate(12, 60)">
+                                <rect x="0" y="0" width="196" height="38" rx="8" fill="rgba(255,255,255,0.03)" stroke="rgba(59,130,246,0.2)" stroke-width="1"/>
+                                <circle cx="20" cy="19" r="10" fill="rgba(59,130,246,0.2)"/>
+                                <path d="M15 19 L20 14 L25 19 L20 24 Z" fill="#3b82f6"/>
+                                <text x="40" y="16" fill="white" font-size="11" font-weight="500">Matching Engine</text>
+                                <text x="40" y="30" fill="rgba(255,255,255,0.4)" font-size="9">5-factor semantic scoring</text>
+                            </g>
+
+                            <g transform="translate(12, 105)">
+                                <rect x="0" y="0" width="196" height="38" rx="8" fill="rgba(255,255,255,0.03)" stroke="rgba(168,85,247,0.2)" stroke-width="1"/>
+                                <circle cx="20" cy="19" r="10" fill="rgba(168,85,247,0.2)"/>
+                                <rect x="14" y="13" width="12" height="12" rx="2" fill="#a855f7"/>
+                                <text x="40" y="16" fill="white" font-size="11" font-weight="500">Pipeline Manager</text>
+                                <text x="40" y="30" fill="rgba(255,255,255,0.4)" font-size="9">Kanban state machine</text>
+                            </g>
+
+                            <g transform="translate(12, 150)">
+                                <rect x="0" y="0" width="196" height="38" rx="8" fill="rgba(255,255,255,0.03)" stroke="rgba(34,197,94,0.2)" stroke-width="1"/>
+                                <circle cx="20" cy="19" r="10" fill="rgba(34,197,94,0.2)"/>
+                                <path d="M15 15 L25 15 L25 23 L15 23 Z M17 17 L23 17" stroke="#22c55e" stroke-width="1.5" fill="none"/>
+                                <text x="40" y="16" fill="white" font-size="11" font-weight="500">Material Generator</text>
+                                <text x="40" y="30" fill="rgba(255,255,255,0.4)" font-size="9">LLM content pipeline</text>
+                            </g>
+
+                            <g transform="translate(12, 195)">
+                                <rect x="0" y="0" width="196" height="38" rx="8" fill="rgba(255,255,255,0.03)" stroke="rgba(251,191,36,0.2)" stroke-width="1"/>
+                                <circle cx="20" cy="19" r="10" fill="rgba(251,191,36,0.2)"/>
+                                <path d="M16 14 L24 14 L24 24 L16 24 Z M20 17 L20 21" stroke="#fbbf24" stroke-width="1.5" fill="none"/>
+                                <text x="40" y="16" fill="white" font-size="11" font-weight="500">Auth Service</text>
+                                <text x="40" y="30" fill="rgba(255,255,255,0.4)" font-size="9">JWT + OAuth2 (GitHub/Google)</text>
+                            </g>
+
+                            <!-- API Badge -->
+                            <g transform="translate(12, 245)">
+                                <rect x="0" y="0" width="60" height="22" rx="11" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+                                <text x="30" y="15" fill="rgba(255,255,255,0.6)" font-size="9" text-anchor="middle">REST API</text>
+                                <rect x="68" y="0" width="60" height="22" rx="11" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+                                <text x="98" y="15" fill="rgba(255,255,255,0.6)" font-size="9" text-anchor="middle">13 Routes</text>
+                                <rect x="136" y="0" width="60" height="22" rx="11" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+                                <text x="166" y="15" fill="rgba(255,255,255,0.6)" font-size="9" text-anchor="middle">Async</text>
+                            </g>
+                        </g>
+                    </g>
+
+                    <!-- Layer 3: Data Layer -->
+                    <g transform="translate(640, 40)">
+                        <g transform="translate(0, 0)">
+                            <rect x="0" y="0" width="160" height="24" rx="12" fill="rgba(168,85,247,0.15)" stroke="rgba(168,85,247,0.3)" stroke-width="1"/>
+                            <circle cx="16" cy="12" r="4" fill="#a855f7"/>
+                            <text x="28" y="16" fill="#a855f7" font-size="10" font-weight="600" letter-spacing="1">DATA LAYER</text>
+                        </g>
+
+                        <!-- MongoDB -->
+                        <g transform="translate(0, 35)" class="arch-node">
+                            <rect x="0" y="0" width="160" height="70" rx="10" fill="url(#cardGrad)" stroke="rgba(34,197,94,0.3)" stroke-width="1.5"/>
+                            <g transform="translate(12, 12)">
+                                <rect x="0" y="0" width="44" height="44" rx="10" fill="rgba(34,197,94,0.1)"/>
+                                <path d="M22 10 L22 34" stroke="#22c55e" stroke-width="3" stroke-linecap="round"/>
+                                <path d="M14 16 Q22 10 30 16" stroke="#22c55e" stroke-width="2" fill="none"/>
+                                <path d="M14 28 Q22 34 30 28" stroke="#22c55e" stroke-width="2" fill="none"/>
+                            </g>
+                            <text x="68" y="28" fill="white" font-size="12" font-weight="600">MongoDB</text>
+                            <text x="68" y="44" fill="rgba(255,255,255,0.5)" font-size="9">Beanie ODM</text>
+                            <text x="68" y="58" fill="rgba(34,197,94,0.6)" font-size="9">Documents</text>
+                        </g>
+
+                        <!-- PostgreSQL -->
+                        <g transform="translate(0, 115)" class="arch-node">
+                            <rect x="0" y="0" width="160" height="70" rx="10" fill="url(#cardGrad)" stroke="rgba(59,130,246,0.3)" stroke-width="1.5"/>
+                            <g transform="translate(12, 12)">
+                                <rect x="0" y="0" width="44" height="44" rx="10" fill="rgba(59,130,246,0.1)"/>
+                                <circle cx="22" cy="22" r="12" stroke="#3b82f6" stroke-width="2" fill="none"/>
+                                <circle cx="22" cy="22" r="5" fill="#3b82f6"/>
+                                <circle cx="22" cy="10" r="2" fill="#3b82f6"/>
+                                <circle cx="22" cy="34" r="2" fill="#3b82f6"/>
+                                <circle cx="10" cy="22" r="2" fill="#3b82f6"/>
+                                <circle cx="34" cy="22" r="2" fill="#3b82f6"/>
+                            </g>
+                            <text x="68" y="28" fill="white" font-size="12" font-weight="600">PostgreSQL</text>
+                            <text x="68" y="44" fill="rgba(255,255,255,0.5)" font-size="9">pgvector ext</text>
+                            <text x="68" y="58" fill="rgba(59,130,246,0.6)" font-size="9">Embeddings</text>
+                        </g>
+
+                        <!-- Redis -->
+                        <g transform="translate(0, 195)" class="arch-node">
+                            <rect x="0" y="0" width="160" height="70" rx="10" fill="url(#cardGrad)" stroke="rgba(239,68,68,0.3)" stroke-width="1.5"/>
+                            <g transform="translate(12, 12)">
+                                <rect x="0" y="0" width="44" height="44" rx="10" fill="rgba(239,68,68,0.1)"/>
+                                <rect x="10" y="14" width="24" height="16" rx="3" stroke="#ef4444" stroke-width="2" fill="none"/>
+                                <line x1="14" y1="20" x2="30" y2="20" stroke="#ef4444" stroke-width="1.5"/>
+                                <line x1="14" y1="26" x2="26" y2="26" stroke="#ef4444" stroke-width="1.5"/>
+                            </g>
+                            <text x="68" y="28" fill="white" font-size="12" font-weight="600">Redis</text>
+                            <text x="68" y="44" fill="rgba(255,255,255,0.5)" font-size="9">In-memory</text>
+                            <text x="68" y="58" fill="rgba(239,68,68,0.6)" font-size="9">Cache + Queue</text>
+                        </g>
+                    </g>
+
+                    <!-- Layer 4: AI/ML -->
+                    <g transform="translate(870, 100)">
+                        <g transform="translate(0, 0)">
+                            <rect x="0" y="0" width="130" height="24" rx="12" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+                            <circle cx="16" cy="12" r="4" fill="#8b5cf6"/>
+                            <text x="28" y="16" fill="#8b5cf6" font-size="10" font-weight="600" letter-spacing="1">AI / ML</text>
+                        </g>
+
+                        <!-- OpenAI Card -->
+                        <g transform="translate(0, 35)" class="arch-node">
+                            <rect x="0" y="0" width="160" height="120" rx="12" fill="url(#cardGrad)" stroke="url(#purpleGrad)" stroke-width="2" filter="url(#softGlow)"/>
+                            <g transform="translate(12, 15)">
+                                <rect x="0" y="0" width="50" height="50" rx="12" fill="rgba(139,92,246,0.15)"/>
+                                <circle cx="25" cy="25" r="15" stroke="url(#purpleGrad)" stroke-width="2" fill="none"/>
+                                <circle cx="25" cy="25" r="6" fill="url(#purpleGrad)"/>
+                                <path d="M25 10 L25 15 M25 35 L25 40 M10 25 L15 25 M35 25 L40 25" stroke="url(#purpleGrad)" stroke-width="2"/>
+                            </g>
+                            <text x="75" y="30" fill="white" font-size="13" font-weight="600">OpenAI</text>
+                            <text x="75" y="48" fill="rgba(255,255,255,0.5)" font-size="10">GPT-4 + Ada</text>
+
+                            <g transform="translate(12, 75)">
+                                <rect x="0" y="0" width="65" height="20" rx="10" fill="rgba(139,92,246,0.2)"/>
+                                <text x="32" y="14" fill="#a78bfa" font-size="8" text-anchor="middle">Embeddings</text>
+                                <rect x="72" y="0" width="65" height="20" rx="10" fill="rgba(139,92,246,0.2)"/>
+                                <text x="104" y="14" fill="#a78bfa" font-size="8" text-anchor="middle">Generation</text>
+                            </g>
+                        </g>
+                    </g>
+
+                    <!-- Layer 5: Frontend -->
+                    <g transform="translate(870, 300)">
+                        <g transform="translate(0, 0)">
+                            <rect x="0" y="0" width="130" height="24" rx="12" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                            <circle cx="16" cy="12" r="4" fill="white"/>
+                            <text x="28" y="16" fill="white" font-size="10" font-weight="600" letter-spacing="1">FRONTEND</text>
+                        </g>
+
+                        <g transform="translate(0, 35)" class="arch-node">
+                            <rect x="0" y="0" width="160" height="110" rx="12" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+
+                            <!-- Next.js -->
+                            <g transform="translate(12, 12)">
+                                <rect x="0" y="0" width="36" height="36" rx="8" fill="rgba(255,255,255,0.1)"/>
+                                <text x="18" y="24" fill="white" font-size="16" font-weight="bold" text-anchor="middle">N</text>
+                            </g>
+                            <text x="60" y="26" fill="white" font-size="12" font-weight="600">Next.js 14</text>
+                            <text x="60" y="42" fill="rgba(255,255,255,0.5)" font-size="9">App Router + RSC</text>
+
+                            <!-- Tech Pills -->
+                            <g transform="translate(12, 58)">
+                                <rect x="0" y="0" width="42" height="18" rx="9" fill="rgba(59,130,246,0.2)" stroke="rgba(59,130,246,0.3)" stroke-width="1"/>
+                                <text x="21" y="13" fill="#60a5fa" font-size="8" text-anchor="middle">React</text>
+                                <rect x="48" y="0" width="50" height="18" rx="9" fill="rgba(34,197,94,0.2)" stroke="rgba(34,197,94,0.3)" stroke-width="1"/>
+                                <text x="73" y="13" fill="#22c55e" font-size="8" text-anchor="middle">Zustand</text>
+                                <rect x="104" y="0" width="42" height="18" rx="9" fill="rgba(168,85,247,0.2)" stroke="rgba(168,85,247,0.3)" stroke-width="1"/>
+                                <text x="125" y="13" fill="#a855f7" font-size="8" text-anchor="middle">Radix</text>
+                            </g>
+                            <g transform="translate(12, 82)">
+                                <rect x="0" y="0" width="55" height="18" rx="9" fill="rgba(251,191,36,0.2)" stroke="rgba(251,191,36,0.3)" stroke-width="1"/>
+                                <text x="27" y="13" fill="#fbbf24" font-size="8" text-anchor="middle">TanStack</text>
+                                <rect x="62" y="0" width="55" height="18" rx="9" fill="rgba(236,72,153,0.2)" stroke="rgba(236,72,153,0.3)" stroke-width="1"/>
+                                <text x="89" y="13" fill="#ec4899" font-size="8" text-anchor="middle">Tailwind</text>
+                            </g>
+                        </g>
+                    </g>
+
+                    <!-- Matching Algorithm Highlight -->
+                    <g transform="translate(300, 370)">
+                        <rect x="0" y="0" width="360" height="95" rx="14" fill="url(#cardGrad)" stroke="url(#accentGrad)" stroke-width="2" filter="url(#glow)"/>
+                        <text x="180" y="22" fill="white" font-size="12" font-weight="600" text-anchor="middle">5-Factor Semantic Matching</text>
+
+                        <!-- Score Bars - Row 1 -->
+                        <g transform="translate(15, 38)">
+                            <text x="0" y="10" fill="rgba(255,255,255,0.6)" font-size="9">Semantic</text>
+                            <rect x="52" y="2" width="90" height="12" rx="6" fill="rgba(255,255,255,0.1)"/>
+                            <rect x="52" y="2" width="63" height="12" rx="6" fill="url(#blueGrad)"/>
+                            <text x="148" y="11" fill="rgba(255,255,255,0.5)" font-size="9">35%</text>
+                        </g>
+                        <g transform="translate(185, 38)">
+                            <text x="0" y="10" fill="rgba(255,255,255,0.6)" font-size="9">Eligibility</text>
+                            <rect x="52" y="2" width="90" height="12" rx="6" fill="rgba(255,255,255,0.1)"/>
+                            <rect x="52" y="2" width="45" height="12" rx="6" fill="url(#greenGrad)"/>
+                            <text x="148" y="11" fill="rgba(255,255,255,0.5)" font-size="9">25%</text>
+                        </g>
+
+                        <!-- Score Bars - Row 2 -->
+                        <g transform="translate(15, 58)">
+                            <text x="0" y="10" fill="rgba(255,255,255,0.6)" font-size="9">Time</text>
+                            <rect x="52" y="2" width="90" height="12" rx="6" fill="rgba(255,255,255,0.1)"/>
+                            <rect x="52" y="2" width="27" height="12" rx="6" fill="url(#purpleGrad)"/>
+                            <text x="148" y="11" fill="rgba(255,255,255,0.5)" font-size="9">15%</text>
+                        </g>
+                        <g transform="translate(185, 58)">
+                            <text x="0" y="10" fill="rgba(255,255,255,0.6)" font-size="9">Intent</text>
+                            <rect x="52" y="2" width="90" height="12" rx="6" fill="rgba(255,255,255,0.1)"/>
+                            <rect x="52" y="2" width="27" height="12" rx="6" fill="rgba(236,72,153,0.6)"/>
+                            <text x="148" y="11" fill="rgba(255,255,255,0.5)" font-size="9">15%</text>
+                        </g>
+
+                        <!-- Team Factor - Centered -->
+                        <g transform="translate(100, 78)">
+                            <text x="0" y="10" fill="rgba(255,255,255,0.6)" font-size="9">Team Fit</text>
+                            <rect x="52" y="2" width="90" height="12" rx="6" fill="rgba(255,255,255,0.1)"/>
+                            <rect x="52" y="2" width="18" height="12" rx="6" fill="rgba(251,191,36,0.6)"/>
+                            <text x="148" y="11" fill="rgba(255,255,255,0.5)" font-size="9">10%</text>
+                        </g>
+                    </g>
+
+                    <!-- Docker Badge -->
+                    <g transform="translate(640, 300)">
+                        <rect x="0" y="0" width="160" height="45" rx="10" fill="url(#cardGrad)" stroke="rgba(59,130,246,0.2)" stroke-width="1"/>
+                        <g transform="translate(12, 8)">
+                            <rect x="0" y="0" width="28" height="28" rx="6" fill="rgba(59,130,246,0.15)"/>
+                            <rect x="6" y="12" width="16" height="10" rx="2" stroke="#3b82f6" stroke-width="1.5" fill="none"/>
+                            <rect x="8" y="6" width="4" height="6" rx="1" fill="#3b82f6"/>
+                            <rect x="14" y="6" width="4" height="6" rx="1" fill="#3b82f6"/>
+                        </g>
+                        <text x="50" y="22" fill="white" font-size="11" font-weight="500">Docker Compose</text>
+                        <text x="50" y="36" fill="rgba(255,255,255,0.4)" font-size="9">Container orchestration</text>
+                    </g>
+                </svg>
+            </div>
+
+            <!-- Enhanced Stats -->
+            <div class="arch-stats-enhanced">
+                <div class="arch-stat-card">
+                    <div class="arch-stat-icon" style="background: rgba(34,197,94,0.15);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <span class="arch-stat-number">11</span>
+                    <span class="arch-stat-text">Data Scrapers</span>
+                </div>
+                <div class="arch-stat-card">
+                    <div class="arch-stat-icon" style="background: rgba(59,130,246,0.15);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        </svg>
+                    </div>
+                    <span class="arch-stat-number">13</span>
+                    <span class="arch-stat-text">API Routes</span>
+                </div>
+                <div class="arch-stat-card">
+                    <div class="arch-stat-icon" style="background: rgba(168,85,247,0.15);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                        </svg>
+                    </div>
+                    <span class="arch-stat-number">3</span>
+                    <span class="arch-stat-text">Databases</span>
+                </div>
+                <div class="arch-stat-card">
+                    <div class="arch-stat-icon" style="background: rgba(236,72,153,0.15);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                    </div>
+                    <span class="arch-stat-number">&lt;200ms</span>
+                    <span class="arch-stat-text">Avg Response</span>
+                </div>
+                <div class="arch-stat-card">
+                    <div class="arch-stat-icon" style="background: rgba(251,191,36,0.15);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2">
+                            <path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/>
+                        </svg>
+                    </div>
+                    <span class="arch-stat-number">5</span>
+                    <span class="arch-stat-text">Match Factors</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: Team -->
+        <div class="slide slide-team" data-slide="8">
+            <h2 style="background: linear-gradient(180deg, #000 0%, #666 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">The Team</h2>
+            <div class="universities-container">
+                <div class="university-badge">Cornell University</div>
+                <div class="university-badge">University of Toronto</div>
+            </div>
+            <p class="team-description">
+                We've lived this problem. Dozens of hackathons. Countless grant applications. We know how broken the discovery process is — and we built the solution.
+            </p>
+            <div class="skills-container">
+                <div class="skill-card">
+                    <h4>AI / ML</h4>
+                    <p>Deep expertise in machine learning and NLP</p>
+                </div>
+                <div class="skill-card">
+                    <h4>Full-Stack</h4>
+                    <p>End-to-end product development</p>
+                </div>
+                <div class="skill-card">
+                    <h4>Startup Ops</h4>
+                    <p>MVP built in 4 weeks, ready to scale</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 9: Closing -->
+        <div class="slide slide-closing" data-slide="9">
+            <h1 class="glow-text">Democratizing<br>Opportunity Discovery</h1>
+            <div class="cta-container">
+                <button class="cta-button">Discover</button>
+                <button class="cta-button">Match</button>
+                <button class="cta-button">Win</button>
+            </div>
+            <div class="thank-you">Thank You — We're OpportunityRadar</div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-container">
+        <button class="nav-arrow" onclick="prevSlide()">←</button>
+        <div class="nav-dots" id="navDots"></div>
+        <button class="nav-arrow" onclick="nextSlide()">→</button>
+        <div class="slide-counter"><span id="currentSlide">1</span> / <span id="totalSlides">9</span></div>
+    </div>
+
+    <script>
+        // Slides functionality
+        const slides = document.querySelectorAll('.slide');
+        const navDots = document.getElementById('navDots');
+        const progress = document.getElementById('progress');
+        const currentSlideEl = document.getElementById('currentSlide');
+        let currentSlide = 0;
+        let charts = {};
+
+        // Create navigation dots
+        slides.forEach((_, index) => {
+            const dot = document.createElement('div');
+            dot.className = 'nav-dot' + (index === 0 ? ' active' : '');
+            dot.onclick = () => goToSlide(index);
+            navDots.appendChild(dot);
+        });
+
+        // Create particles
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 20; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 20 + 's';
+            particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+            particlesContainer.appendChild(particle);
+        }
+
+        // Spotlight effect
+        document.addEventListener('mousemove', (e) => {
+            const spotlight = document.getElementById('spotlight');
+            const x = (e.clientX / window.innerWidth) * 100;
+            const y = (e.clientY / window.innerHeight) * 100;
+            spotlight.style.setProperty('--mouse-x', x + '%');
+            spotlight.style.setProperty('--mouse-y', y + '%');
+        });
+
+        function updateSlide() {
+            slides.forEach((slide, index) => {
+                slide.classList.toggle('active', index === currentSlide);
+            });
+            
+            document.querySelectorAll('.nav-dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentSlide);
+            });
+
+            // Update progress
+            const progressWidth = ((currentSlide + 1) / slides.length) * 100;
+            progress.style.width = progressWidth + '%';
+            currentSlideEl.textContent = currentSlide + 1;
+
+            // Animate counters
+            if (currentSlide === 1) {
+                animateCounters();
+            }
+
+            // Initialize charts
+            if (currentSlide === 3) {
+                initTractionChart();
+            }
+            if (currentSlide === 5) {
+                initMarketChart();
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+                updateSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateSlide();
+            }
+        }
+
+        function goToSlide(index) {
+            currentSlide = index;
+            updateSlide();
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        // Touch navigation
+        let touchStartX = 0;
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const diff = touchStartX - touchEndX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) nextSlide();
+                else prevSlide();
+            }
+        });
+
+        // Counter animation
+        function animateCounters() {
+            const counters = document.querySelectorAll('.count-up');
+            counters.forEach(counter => {
+                const target = parseInt(counter.dataset.target);
+                const duration = 2000;
+                const step = target / (duration / 16);
+                let current = 0;
+                
+                const updateCounter = () => {
+                    current += step;
+                    if (current < target) {
+                        counter.textContent = Math.floor(current);
+                        requestAnimationFrame(updateCounter);
+                    } else {
+                        counter.textContent = target;
+                    }
+                };
+                
+                updateCounter();
+            });
+        }
+
+        // Chart.js - Traction Chart
+        function initTractionChart() {
+            if (charts.traction) return;
+            
+            const ctx = document.getElementById('tractionChart').getContext('2d');
+            charts.traction = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'],
+                    datasets: [{
+                        label: 'Opportunities Aggregated',
+                        data: [100, 250, 450, 650, 850, 1000],
+                        borderColor: '#fff',
+                        backgroundColor: 'rgba(255,255,255,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#fff',
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255,255,255,0.05)'
+                            },
+                            ticks: {
+                                color: 'rgba(255,255,255,0.5)'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255,255,255,0.05)'
+                            },
+                            ticks: {
+                                color: 'rgba(255,255,255,0.5)'
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+
+        // Chart.js - Market Chart
+        function initMarketChart() {
+            if (charts.market) return;
+            
+            const ctx = document.getElementById('marketChart').getContext('2d');
+            charts.market = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Government Grants', 'Corporate Competitions', 'Hackathons', 'Accelerators'],
+                    datasets: [{
+                        data: [50, 25, 15, 10],
+                        backgroundColor: [
+                            '#ffffff',
+                            '#a1a1aa',
+                            '#71717a',
+                            '#3f3f46'
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: 'rgba(255,255,255,0.7)',
+                                padding: 20,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        animateRotate: true,
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+
+        // Initialize
+        updateSlide();
+    </script>
+</body>
+</html>
