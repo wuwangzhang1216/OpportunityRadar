@@ -51,10 +51,9 @@ coverage.xml
 *.pot
 
 # Environments
-# Note: .env is tracked in this private repo
-# .env
-# .env.local
-# .env.*.local
+.env
+.env.local
+.env.*.local
 .venv
 env/
 venv/
