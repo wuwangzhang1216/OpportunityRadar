@@ -41,6 +41,9 @@ dependencies = [
     "apscheduler>=3.10.0",
     "redis>=5.0.0",
 
+    # Rate Limiting
+    "slowapi>=0.1.9",
+
     # Templating
     "jinja2>=3.1.0",
 
@@ -88,3 +91,30 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+# Stricter type checking (enable gradually)
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+# Exclude patterns for third-party code
+exclude = [
+    "tests/",
+    "scripts/",
+    "alembic/",
+]
+
+# Per-module overrides for gradual migration
+[[tool.mypy.overrides]]
+module = [
+    "src.opportunity_radar.scrapers.*",
+    "src.opportunity_radar.ai.*",
+]
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+check_untyped_defs = false

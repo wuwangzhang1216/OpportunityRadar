@@ -4,13 +4,12 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from beanie import PydanticObjectId
-from beanie.operators import In
 
 from ....core.security import get_current_user
 from ....models.user import User
 from ....models.match import Match
-from ....models.opportunity import Opportunity
 from ....models.profile import Profile
+from .helpers import get_user_match, enrich_matches_with_opportunities
 
 router = APIRouter()
 
@@ -51,27 +50,12 @@ async def list_matches(
             "offset": actual_offset,
         }
 
-    # Fetch related opportunities in bulk for enrichment
-    opp_ids = [m.opportunity_id for m in matches]
-    opps = await Opportunity.find(In(Opportunity.id, opp_ids)).to_list()
-    opp_by_id = {o.id: o for o in opps}
-
-    # Enrich matches with opportunity data (same as /top endpoint)
-    items = []
-    for m in matches:
-        opp = opp_by_id.get(m.opportunity_id)
-        match_data = m.model_dump(mode="json")
-        # Frontend compatibility aliases
-        match_data["score"] = m.overall_score
-        match_data["batch_id"] = str(m.opportunity_id) if m.opportunity_id else None
-        # Enriched opportunity data
-        match_data["opportunity_title"] = opp.title if opp else None
-        match_data["opportunity_category"] = opp.opportunity_type if opp else None
-        match_data["opportunity_description"] = opp.description if opp else None
-        match_data["deadline"] = opp.application_deadline.isoformat() if opp and opp.application_deadline else None
-        match_data["opportunity_url"] = opp.website_url if opp else None
-        match_data["opportunity_prize_pool"] = opp.total_prize_value if opp else None
-        items.append(match_data)
+    # Enrich matches with opportunity data using helper
+    items = await enrich_matches_with_opportunities(
+        matches,
+        include_description=True,
+        include_prize_pool=True,
+    )
 
     return {
         "items": items,
@@ -100,25 +84,8 @@ async def get_top_matches(
     if not matches:
         return {"items": [], "count": 0}
 
-    # Fetch related opportunities in bulk
-    opp_ids = [m.opportunity_id for m in matches]
-    opps = await Opportunity.find(In(Opportunity.id, opp_ids)).to_list()
-    opp_by_id = {o.id: o for o in opps}
-
-    # Enrich matches with opportunity data
-    items = []
-    for m in matches:
-        opp = opp_by_id.get(m.opportunity_id)
-        match_data = m.model_dump(mode="json")
-        # Frontend compatibility aliases
-        match_data["score"] = m.overall_score
-        match_data["batch_id"] = str(m.opportunity_id) if m.opportunity_id else None
-        # Enriched opportunity data
-        match_data["opportunity_title"] = opp.title if opp else None
-        match_data["opportunity_category"] = opp.opportunity_type if opp else None
-        match_data["deadline"] = opp.application_deadline.isoformat() if opp and opp.application_deadline else None
-        match_data["opportunity_url"] = opp.website_url if opp else None
-        items.append(match_data)
+    # Enrich matches with opportunity data using helper
+    items = await enrich_matches_with_opportunities(matches)
 
     return {"items": items, "count": len(items)}
 
@@ -308,23 +275,9 @@ async def dismiss_match(
     current_user: User = Depends(get_current_user),
 ):
     """Dismiss a match (hide from recommendations)."""
-    try:
-        match = await Match.get(PydanticObjectId(match_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match not found",
-        )
-
-    if not match or match.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match not found",
-        )
-
+    match = await get_user_match(match_id, current_user)
     match.is_dismissed = True
     await match.save()
-
     return {"message": "Match dismissed", "match_id": match_id}
 
 
@@ -334,23 +287,9 @@ async def bookmark_match(
     current_user: User = Depends(get_current_user),
 ):
     """Bookmark a match (save for later)."""
-    try:
-        match = await Match.get(PydanticObjectId(match_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match not found",
-        )
-
-    if not match or match.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match not found",
-        )
-
+    match = await get_user_match(match_id, current_user)
     match.is_bookmarked = True
     await match.save()
-
     return {"message": "Match bookmarked", "match_id": match_id}
 
 
@@ -360,23 +299,9 @@ async def unbookmark_match(
     current_user: User = Depends(get_current_user),
 ):
     """Remove bookmark from a match."""
-    try:
-        match = await Match.get(PydanticObjectId(match_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match not found",
-        )
-
-    if not match or match.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match not found",
-        )
-
+    match = await get_user_match(match_id, current_user)
     match.is_bookmarked = False
     await match.save()
-
     return {"message": "Bookmark removed", "match_id": match_id}
 
 
@@ -386,21 +311,7 @@ async def restore_match(
     current_user: User = Depends(get_current_user),
 ):
     """Restore a dismissed match."""
-    try:
-        match = await Match.get(PydanticObjectId(match_id))
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match not found",
-        )
-
-    if not match or match.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match not found",
-        )
-
+    match = await get_user_match(match_id, current_user)
     match.is_dismissed = False
     await match.save()
-
     return {"message": "Match restored", "match_id": match_id}

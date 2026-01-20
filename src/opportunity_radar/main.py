@@ -7,9 +7,13 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from .config import settings
 from .core.exceptions import AppException
+from .core.rate_limit import limiter, rate_limit_exceeded_handler
+from .core.redis_client import close_redis
 from .api.v1.router import api_router
 from .db.mongodb import init_db, close_db
 
@@ -32,6 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     yield
     # Shutdown
     print(f"Shutting down {settings.app_name}...")
+    await close_redis()
     await close_db()
 
 
@@ -45,6 +50,10 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if settings.is_development else None,
         lifespan=lifespan,
     )
+
+    # Rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
     # CORS middleware
     app.add_middleware(

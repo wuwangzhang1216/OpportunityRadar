@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -12,13 +12,12 @@ from pydantic import BaseModel
 from ....schemas.user import UserCreate, UserResponse, Token
 from ....services.auth_service import AuthService
 from ....core.oauth import get_oauth_provider, OAuthUser
+from ....core.rate_limit import limiter, RateLimits
+from ....core.redis_client import OAuthStateStore
 from ....models.user import User
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-
-# In-memory state storage (use Redis in production)
-_oauth_states: dict = {}
 
 
 class OAuthCallbackRequest(BaseModel):
@@ -36,7 +35,8 @@ class OAuthURLResponse(BaseModel):
 
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def signup(user_data: UserCreate):
+@limiter.limit(RateLimits.AUTH_SIGNUP)
+async def signup(request: Request, user_data: UserCreate):
     """Register a new user."""
     auth_service = AuthService()
     user = await auth_service.create_user(user_data)
@@ -44,7 +44,8 @@ async def signup(user_data: UserCreate):
 
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit(RateLimits.AUTH_LOGIN)
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     """Authenticate user and return JWT tokens."""
     auth_service = AuthService()
     tokens = await auth_service.authenticate(form_data.username, form_data.password)
@@ -66,18 +67,27 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
 
 @router.get("/oauth/{provider}/authorize", response_model=OAuthURLResponse)
+@limiter.limit(RateLimits.AUTH_LOGIN)
 async def oauth_authorize(
+    request: Request,
     provider: Literal["github", "google"],
 ):
     """Get OAuth authorization URL for a provider."""
     oauth = get_oauth_provider(provider)
 
-    # Generate and store state for CSRF protection
+    # Generate and store state for CSRF protection (using Redis)
     state = secrets.token_urlsafe(32)
-    _oauth_states[state] = {
+    state_data = {
         "provider": provider,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.utcnow().isoformat(),
     }
+
+    stored = await OAuthStateStore.store(state, state_data)
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to initialize OAuth flow",
+        )
 
     url = oauth.get_authorize_url(state)
 
@@ -85,19 +95,21 @@ async def oauth_authorize(
 
 
 @router.post("/oauth/{provider}/callback", response_model=Token)
+@limiter.limit(RateLimits.AUTH_LOGIN)
 async def oauth_callback(
+    request: Request,
     provider: Literal["github", "google"],
     callback: OAuthCallbackRequest,
 ):
     """Handle OAuth callback and exchange code for tokens."""
-    # Validate state
-    if callback.state not in _oauth_states:
+    # Validate state (atomically get and delete from Redis)
+    state_data = await OAuthStateStore.get_and_delete(callback.state)
+    if not state_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired state parameter",
         )
 
-    state_data = _oauth_states.pop(callback.state)
     if state_data["provider"] != provider:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
